@@ -1,16 +1,59 @@
-# React + Vite
+# Glowbook Booking
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Public booking page for Glowbook masters. This is a standalone React application where customers can view services and book appointments with masters.
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This is a separate project from the main Glowbook mobile app, designed to be fully isolated and independently deployable.
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies:
 
-## Expanding the ESLint configuration
+```bash
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Development
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
+
+## Build
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+## Page Structure
+
+The booking page includes the following sections:
+
+- **Header**: Master/business name
+- **Master Info**: Master details and information
+- **Services List**: List of available services
+- **Booking Calendar**: Calendar and time slot selection
+- **Footer**: Additional information
+
+## Tech Stack
+
+- React 19
+- Vite 7
+- Modern CSS (no frameworks for now, keep it simple)
+
+## URL Generation
+
+The URL to this booking page will be generated in the Glowbook mobile app and shared with customers.
