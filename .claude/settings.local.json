@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tailwindcss init -p)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx shadcn@latest add button:*)",
+      "Bash(npx shadcn@latest add:*)"
+    ]
+  }
+}
