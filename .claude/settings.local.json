@@ -8,7 +8,10 @@
       "Bash(npx shadcn@latest init:*)",
       "Bash(taskkill:*)",
       "Bash(npx shadcn@latest add button:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(go build:*)",
+      "Bash(timeout 5 go run:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

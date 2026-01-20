@@ -1,12 +1,22 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useServices } from '@/hooks/use-services'
+import { Service } from '@/types/service'
 import { Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BookingDialog } from '@/components/booking-dialog'
 
 export function MasterBooking() {
   const { id } = useParams<{ id: string }>()
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const { data, isLoading, error } = useServices(id!)
+
+  const handleServiceClick = (service: Service) => {
+    setSelectedService(service)
+    setDialogOpen(true)
+  }
 
   if (isLoading) {
     return (
@@ -68,7 +78,10 @@ export function MasterBooking() {
                       {service.currency} {(service.price / 100).toFixed(2)}
                     </span>
                   </div>
-                  <Button className="w-full">
+                  <Button
+                    className="w-full"
+                    onClick={() => handleServiceClick(service)}
+                  >
                     <Calendar className="mr-2 h-4 w-4" />
                     Book Now
                   </Button>
@@ -77,15 +90,6 @@ export function MasterBooking() {
             </div>
           )}
         </section>
-
-        <section className="mb-12">
-          <h2 className="text-2xl font-semibold mb-6">Schedule</h2>
-          <div className="border rounded-lg p-8 bg-muted/50">
-            <p className="text-center text-muted-foreground">
-              Calendar and time slots will go here
-            </p>
-          </div>
-        </section>
       </main>
 
       <footer className="border-t mt-12">
@@ -93,6 +97,13 @@ export function MasterBooking() {
           <p>Glowbook Booking System</p>
         </div>
       </footer>
+
+      <BookingDialog
+        masterId={id!}
+        service={selectedService}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   )
 }
