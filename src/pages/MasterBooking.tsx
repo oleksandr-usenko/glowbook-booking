@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useServices } from '@/hooks/use-services'
 import { Service } from '@/types/service'
-import { Calendar } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ServiceCard } from '@/components/service-card'
 import { BookingDialog } from '@/components/booking-dialog'
 
 export function MasterBooking() {
@@ -62,30 +61,11 @@ export function MasterBooking() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {services.map((service) => (
-                <div
+                <ServiceCard
                   key={service.id}
-                  className="border rounded-lg p-6 hover:shadow-lg transition-shadow"
-                >
-                  <h3 className="text-xl font-semibold mb-2">{service.name}</h3>
-                  {service.description && (
-                    <p className="text-muted-foreground mb-4">{service.description}</p>
-                  )}
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-muted-foreground">
-                      {service.duration} min
-                    </span>
-                    <span className="text-lg font-semibold">
-                      {service.currency} {(service.price / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={() => handleServiceClick(service)}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Book Now
-                  </Button>
-                </div>
+                  service={service}
+                  onBookClick={handleServiceClick}
+                />
               ))}
             </div>
           )}

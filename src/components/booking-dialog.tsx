@@ -13,7 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { SmartImage } from '@/components/smart-image'
 import { cn } from '@/lib/utils'
+
+function isValidImageUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://')
+}
 
 interface BookingDialogProps {
   masterId: string
@@ -58,6 +63,10 @@ export function BookingDialog({
 
   if (!service) return null
 
+  const validImages = service.media?.filter(
+    (item) => item.mimeType?.startsWith('image/') && isValidImageUrl(item.uri)
+  ) || []
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -71,6 +80,17 @@ export function BookingDialog({
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
+          {/* Service Images Carousel */}
+          {validImages.length === 1 && (
+            <div className="aspect-video relative rounded-md overflow-hidden">
+              <SmartImage
+                src={validImages[0].uri}
+                alt={validImages[0].fileName || service.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           {/* Calendar Section */}
           <div>
             <h3 className="text-sm font-medium mb-3">Select a date</h3>
