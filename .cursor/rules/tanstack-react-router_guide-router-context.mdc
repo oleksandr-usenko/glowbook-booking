@@ -1,0 +1,538 @@
+---
+description: TanStack Router Guide: Router Context and Scroll Restoration
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Router Context
+
+TanStack Router's router context is a very powerful tool that can be used for dependency injection among many other things. Aptly named, the router context is passed through the router and down through each matching route. At each route in the hierarchy, the context can be modified or added to. Here's a few ways you might use the router context practically:
+
+- Dependency Injection
+  - You can supply dependencies (e.g. a loader function, a data fetching client, a mutation service) which the route and all child routes can access and use without importing or creating directly.
+- Breadcrumbs
+  - While the main context object for each route is merged as it descends, each route's unique context is also stored making it possible to attach breadcrumbs or methods to each route's context.
+- Dynamic meta tag management
+  - You can attach meta tags to each route's context and then use a meta tag manager to dynamically update the meta tags on the page as the user navigates the site.
+
+These are just suggested uses of the router context. You can use it for whatever you want!
+
+## Typed Router Context
+
+Like everything else, the root router context is strictly typed. This type can be augmented via any route's `beforeLoad` option as it is merged down the route match tree. To constrain the type of the root router context, you must use the `createRootRouteWithContext<YourContextTypeHere>()(routeOptions)` function to create a new router context instead of the `createRootRoute()` function to create your root route. Here's an example:
+
+```tsx
+import { createRootRouteWithContext, createRouter } from "@tanstack/react-router";
+
+interface MyRouterContext {
+  user: User;
+}
+
+// Use the routerContext to create your root route
+const rootRoute = createRootRouteWithContext<MyRouterContext>()({
+  component: App,
+});
+
+const routeTree = rootRoute.addChildren([
+  // ...
+]);
+
+// Use the routerContext to create your router
+const router = createRouter({
+  routeTree,
+});
+```
+
+## Passing the initial Router Context
+
+The router context is passed to the router at instantiation time. You can pass the initial router context to the router via the `context` option:
+
+> [!TIP]
+> If your context has any required properties, you will see a TypeScript error if you don't pass them in the initial router context. If all of your context properties are optional, you will not see a TypeScript error and passing the context will be optional. If you don't pass a router context, it defaults to `{}`.
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+// Use the routerContext you created to create your router
+const router = createRouter({
+  routeTree,
+  context: {
+    user: {
+      id: "123",
+      name: "John Doe",
+    },
+  },
+});
+```
+
+### Invalidating the Router Context
+
+If you need to invalidate the context state you are passing into the router, you can call the `invalidate` method to tell the router to recompute the context. This is useful when you need to update the context state and have the router recompute the context for all routes.
+
+```tsx
+function useAuth() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
+      router.invalidate();
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return user;
+}
+```
+
+## Using the Router Context
+
+Once you have defined the router context type, you can use it in your route definitions:
+
+```tsx
+// src/routes/todos.tsx
+export const Route = createFileRoute({
+  component: Todos,
+  loader: ({ context }) => fetchTodosByUserId(context.user.id),
+});
+```
+
+You can even inject data fetching and mutation implementations themselves! In fact, this is highly recommended 😜
+
+Let's try this with a simple function to fetch some todos:
+
+```tsx
+const fetchTodosByUserId = async ({ userId }) => {
+  const response = await fetch(`/api/todos?userId=${userId}`);
+  const data = await response.json();
+  return data;
+};
+
+const router = createRouter({
+  routeTree: rootRoute,
+  context: {
+    userId: "123",
+    fetchTodosByUserId,
+  },
+});
+```
+
+Then, in your route:
+
+```tsx
+// src/routes/todos.tsx
+export const Route = createFileRoute({
+  component: Todos,
+  loader: ({ context }) => context.fetchTodosByUserId(context.userId),
+});
+```
+
+### How about an external data fetching library?
+
+```tsx
+import { createRootRouteWithContext, createRouter } from "@tanstack/react-router";
+
+interface MyRouterContext {
+  queryClient: QueryClient;
+}
+
+const rootRoute = createRootRouteWithContext<MyRouterContext>()({
+  component: App,
+});
+
+const queryClient = new QueryClient();
+
+const router = createRouter({
+  routeTree: rootRoute,
+  context: {
+    queryClient,
+  },
+});
+```
+
+Then, in your route:
+
+```tsx
+// src/routes/todos.tsx
+export const Route = createFileRoute({
+  component: Todos,
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData({
+      queryKey: ["todos", { userId: user.id }],
+      queryFn: fetchTodos,
+    });
+  },
+});
+```
+
+## How about using React Context/Hooks?
+
+When trying to use React Context or Hooks in your route's `beforeLoad` or `loader` functions, it's important to remember React's [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks). You can't use hooks in a non-React function, so you can't use hooks in your `beforeLoad` or `loader` functions.
+
+So, how do we use React Context or Hooks in our route's `beforeLoad` or `loader` functions? We can use the router context to pass down the React Context or Hooks to our route's `beforeLoad` or `loader` functions.
+
+Let's look at the setup for an example, where we pass down a `useNetworkStrength` hook to our route's `loader` function:
+
+- `src/routes/__root.tsx`
+
+```tsx
+// First, make sure the context for the root route is typed
+import { createRootRouteWithContext } from "@tanstack/react-router";
+import { useNetworkStrength } from "@/hooks/useNetworkStrength";
+
+interface MyRouterContext {
+  networkStrength: ReturnType<typeof useNetworkStrength>;
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+  component: App,
+});
+```
+
+In this example, we'd instantiate the hook before rendering the router using the `<RouterProvider />`. This way, the hook would be called in React-land, therefore adhering to the Rules of Hooks.
+
+- `src/router.tsx`
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+import { routeTree } from "./routeTree.gen";
+
+export const router = createRouter({
+  routeTree,
+  context: {
+    networkStrength: undefined!, // We'll set this in React-land
+  },
+});
+```
+
+- `src/main.tsx`
+
+```tsx
+import { RouterProvider } from "@tanstack/react-router";
+import { router } from "./router";
+
+import { useNetworkStrength } from "@/hooks/useNetworkStrength";
+
+function App() {
+  const networkStrength = useNetworkStrength();
+  // Inject the returned value from the hook into the router context
+  return <RouterProvider router={router} context={{ networkStrength }} />;
+}
+
+// ...
+```
+
+So, now in our route's `loader` function, we can access the `networkStrength` hook from the router context:
+
+- `src/routes/posts.tsx`
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute({
+  component: Posts,
+  loader: ({ context }) => {
+    if (context.networkStrength === "STRONG") {
+      // Do something
+    }
+  },
+});
+```
+
+## Modifying the Router Context
+
+The router context is passed down the route tree and is merged at each route. This means that you can modify the context at each route and the modifications will be available to all child routes. Here's an example:
+
+- `src/routes/__root.tsx`
+
+```tsx
+import { createRootRouteWithContext } from "@tanstack/react-router";
+
+interface MyRouterContext {
+  foo: boolean;
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+  component: App,
+});
+```
+
+- `src/router.tsx`
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+import { routeTree } from "./routeTree.gen";
+
+const router = createRouter({
+  routeTree,
+  context: {
+    foo: true,
+  },
+});
+```
+
+- `src/routes/todos.tsx`
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute({
+  component: Todos,
+  beforeLoad: () => {
+    return {
+      bar: true,
+    };
+  },
+  loader: ({ context }) => {
+    context.foo; // true
+    context.bar; // true
+  },
+});
+```
+
+## Processing Accumulated Route Context
+
+Context, especially the isolated route `context` objects, make it trivial to accumulate and process the route context objects for all matched routes. Here's an example where we use all of the matched route contexts to generate a breadcrumb trail:
+
+```tsx
+// src/routes/__root.tsx
+export const Route = createRootRoute({
+  component: () => {
+    const matches = useRouterState({ select: (s) => s.matches });
+
+    const breadcrumbs = matches
+      .filter((match) => match.context.getTitle)
+      .map(({ pathname, context }) => {
+        return {
+          title: context.getTitle(),
+          path: pathname,
+        };
+      });
+
+    // ...
+  },
+});
+```
+
+Using that same route context, we could also generate a title tag for our page's `<head>`:
+
+```tsx
+// src/routes/__root.tsx
+export const Route = createRootRoute({
+  component: () => {
+    const matches = useRouterState({ select: (s) => s.matches });
+
+    const matchWithTitle = [...matches].reverse().find((d) => d.context.getTitle);
+
+    const title = matchWithTitle?.context.getTitle() || "My App";
+
+    return (
+      <html>
+        <head>
+          <title>{title}</title>
+        </head>
+        <body>{/* ... */}</body>
+      </html>
+    );
+  },
+});
+```
+
+# Scroll Restoration
+
+## Hash/Top-of-Page Scrolling
+
+Out of the box, TanStack Router supports both **hash scrolling** and **top-of-page scrolling** without any additional configuration.
+
+## Scroll-to-top & Nested Scrollable Areas
+
+By default, scroll-to-top mimics the behavior of the browser, which means only the `window` itself is scrolled to the top after successful navigation. For many apps however, it's common for the main scrollable area to be a nested div or similar because of advanced layouts. If you would like TanStack Router to also scroll these main scrollable areas for you, you can add selectors to target them using the `routerOptions.scrollToTopSelectors`:
+
+```tsx
+const router = createRouter({
+  scrollToTopSelectors: ["#main-scrollable-area"],
+});
+```
+
+For complex selectors that cannot be simply resolved using `document.querySelector(selector)`, you can pass functions that return HTML elements to `routerOptions.scrollToTopSelectors`:
+
+```tsx
+const selector = () =>
+  document.querySelector("#shadowRootParent")?.shadowRoot?.querySelector("#main-scrollable-area");
+
+const router = createRouter({
+  scrollToTopSelectors: [selector],
+});
+```
+
+These selectors are handled **in addition to `window`** which cannot be disabled currently.
+
+## Scroll Restoration
+
+Scroll restoration is the process of restoring the scroll position of a page when the user navigates back to it. This is normally a built-in feature for standard HTML based websites, but can be difficult to replicate for SPA applications because:
+
+- SPAs typically use the `history.pushState` API for navigation, so the browser doesn't know to restore the scroll position natively
+- SPAs sometimes render content asynchronously, so the browser doesn't know the height of the page until after it's rendered
+- SPAs can sometimes use nested scrollable containers to force specific layouts and features.
+
+Not only that, but it's very common for applications to have multiple scrollable areas within an app, not just the body. For example, a chat application might have a scrollable sidebar and a scrollable chat area. In this case, you would want to restore the scroll position of both areas independently.
+
+To alleviate this problem, TanStack Router provides a scroll restoration component and hook that handle the process of monitoring, caching and restoring scroll positions for you.
+
+It does this by:
+
+- Monitoring the DOM for scroll events
+- Registering scrollable areas with the scroll restoration cache
+- Listening to the proper router events to know when to cache and restore scroll positions
+- Storing scroll positions for each scrollable area in the cache (including `window` and `body`)
+- Restoring scroll positions after successful navigations before DOM paint
+
+That may sound like a lot, but for you, it's as simple as this:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  scrollRestoration: true,
+});
+```
+
+> [!NOTE]
+> The `<ScrollRestoration />` component still works, but has been deprecated.
+
+## Custom Cache Keys
+
+Falling in behind Remix's own Scroll Restoration APIs, you can also customize the key used to cache scroll positions for a given scrollable area using the `getKey` option. This could be used, for example, to force the same scroll position to be used regardless of the users browser history.
+
+The `getKey` option receives the relevant `Location` state from TanStack Router and expects you to return a string to uniquely identify the scrollable measurements for that state.
+
+The default `getKey` is `(location) => location.state.key!`, where `key` is the unique key generated for each entry in the history.
+
+## Examples
+
+You could sync scrolling to the pathname:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  getScrollRestorationKey: (location) => location.pathname,
+});
+```
+
+You can conditionally sync only some paths, then use the key for the rest:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  getScrollRestorationKey: (location) => {
+    const paths = ["/", "/chat"];
+    return paths.includes(location.pathname) ? location.pathname : location.state.key!;
+  },
+});
+```
+
+## Preventing Scroll Restoration
+
+Sometimes you may want to prevent scroll restoration from happening. To do this you can utilize the `resetScroll` option available on the following APIs:
+
+- `<Link resetScroll={false}>`
+- `navigate({ resetScroll: false })`
+- `redirect({ resetScroll: false })`
+
+When `resetScroll` is set to `false`, the scroll position for the next navigation will not be restored (if navigating to an existing history event in the stack) or reset to the top (if it's a new history event in the stack).
+
+## Manual Scroll Restoration
+
+Most of the time, you won't need to do anything special to get scroll restoration to work. However, there are some cases where you may need to manually control scroll restoration. The most common example is **virtualized lists**.
+
+To manually control scroll restoration for virtualized lists within the whole browser window:
+
+[//]: # "VirtualizedWindowScrollRestorationExample"
+
+```tsx
+function Component() {
+  const scrollEntry = useElementScrollRestoration({
+    getElement: () => window,
+  })
+
+  // Let's use TanStack Virtual to virtualize some content!
+  const virtualizer = useWindowVirtualizer({
+    count: 10000,
+    estimateSize: () => 100,
+    // We pass the scrollY from the scroll restoration entry to the virtualizer
+    // as the initial offset
+    initialOffset: scrollEntry?.scrollY,
+  })
+
+  return (
+    <div>
+      {virtualizer.getVirtualItems().map(item => (
+        ...
+      ))}
+    </div>
+  )
+}
+```
+
+[//]: # "VirtualizedWindowScrollRestorationExample"
+
+To manually control scroll restoration for a specific element, you can use the `useElementScrollRestoration` hook and the `data-scroll-restoration-id` DOM attribute:
+
+[//]: # "ManualRestorationExample"
+
+```tsx
+function Component() {
+  // We need a unique ID for manual scroll restoration on a specific element
+  // It should be as unique as possible for this element across your app
+  const scrollRestorationId = "myVirtualizedContent";
+
+  // We use that ID to get the scroll entry for this element
+  const scrollEntry = useElementScrollRestoration({
+    id: scrollRestorationId,
+  });
+
+  // Let's use TanStack Virtual to virtualize some content!
+  const virtualizerParentRef = React.useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: 10000,
+    getScrollElement: () => virtualizerParentRef.current,
+    estimateSize: () => 100,
+    // We pass the scrollY from the scroll restoration entry to the virtualizer
+    // as the initial offset
+    initialOffset: scrollEntry?.scrollY,
+  });
+
+  return (
+    <div
+      ref={virtualizerParentRef}
+      // We pass the scroll restoration ID to the element
+      // as a custom attribute that will get picked up by the
+      // scroll restoration watcher
+      data-scroll-restoration-id={scrollRestorationId}
+      className="relative flex-1 overflow-auto rounded-lg border"
+    >
+      ...
+    </div>
+  );
+}
+```
+
+[//]: # "ManualRestorationExample"
+
+## Scroll Behavior
+
+To control the scroll behavior when navigating between pages, you can use the `scrollRestorationBehavior` option. This allows you to make the transition between pages instant instead of a smooth scroll. The global configuration of scroll restoration behavior has the same options as those supported by the browser, which are `smooth`, `instant`, and `auto` (see [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#behavior) for more information).
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  scrollRestorationBehavior: "instant",
+});
+```
+

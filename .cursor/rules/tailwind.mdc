@@ -1,0 +1,31 @@
+---
+description: Tailwind v4 rule.
+globs: *.ts, *.tsx
+alwaysApply: true
+---
+
+# Tailwind CSS v4 Guidelines
+
+## Core Principles
+
+- Only use Tailwind CSS v4 documentation and features
+- Use the all-CSS architecture (no PostCSS or Autoprefixer)
+- Avoid any references to older configuration styles
+
+## Configuration
+
+- Do not use `tailwind.config.ts` files
+- Do not use JIT (Just-in-Time) compilation as it was for v3
+- Do not use PostCSS or Autoprefixer
+
+## Version Requirements
+
+- All documentation must reference Tailwind CSS v4
+- All explanations must include v4-specific features
+- Reject any documentation or features from versions before v4
+
+## Implementation Notes
+
+- Tailwind v4 uses an all-CSS architecture
+- Any usage or references to older config styles should be flagged
+- Focus on v4-specific features and patterns

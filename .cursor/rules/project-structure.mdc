@@ -1,0 +1,179 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+---
+description: Guildelines for the project structure of the main application.
+globs: *.ts, *.tsx
+---
+
+# Project Structure
+
+## Web App (`/web`)
+
+The web application is built using React and follows a modern, organized structure:
+
+### Core Application Files
+- `app/entry.client.tsx` - Client-side entry point
+- `app/root.tsx` - Root component and main application setup
+- `app/routes.ts` - Route definitions and configuration
+
+### Key Directories
+- `app/routes/` - Application routes and pages
+  - `_index/` - Home page route
+  - `settings.company/` - Company settings routes
+    - `_index/` - Company settings main page
+    - `users/` - Company users management
+  - `contracts/` - Contract management routes
+    - `_index/` - Contracts main page
+    - `with-clients/` - Client contracts
+    - `with-contractors/` - Contractor contracts
+  - `$/` - Error handling routes
+- `app/layout/` - Layout components and templates
+  - `SidebarLayout.tsx` - Main sidebar layout component
+  - `components/` - Layout-specific components
+- `app/providers/` - Context providers and state management
+  - `AppProviders.tsx` - Main providers wrapper
+  - `index.ts` - Providers exports
+- `app/styles/` - Global styles and CSS modules
+- `public/` - Static assets and public files
+- `env/` - Environment configuration files
+
+### Configuration Files
+- `vite.config.ts` - Vite bundler configuration
+- `vitest.config.ts` - Vitest testing configuration
+- `vitest.setup.ts` - Test setup and global test configuration
+- `react-router.config.ts` - React Router configuration
+- `tsconfig.json` - TypeScript configuration
+- `eslint.config.js` - ESLint configuration
+- `env.d.ts` - TypeScript type definitions
+
+### Development Tools
+- `.turbo/` - Turborepo cache and configuration
+- `.react-router/` - React Router cache
+- `dev-server/` - Development server configuration
+
+### Configuration
+- `package.json` - Project dependencies and scripts
+- `tsconfig.json` - TypeScript configuration
+- `jest.config.js` - Jest testing configuration
+- `.env` - Environment variables
+- `.env.example` - Example environment variables
+
+## Shared Resources
+
+- `shared/` - Shared code and utilities between frontend and backend
+  - `types/` - Shared TypeScript types
+  - `constants/` - Shared constants
+  - `utils/` - Shared utility functions
+
+## Development Tools
+
+- `.github/` - GitHub workflows and templates
+- `.vscode/` - VS Code configuration
+- `.cursor/` - Cursor IDE configuration
+- `scripts/` - Development and deployment scripts
+- `docs/` - Project documentation
+
+## Root Configuration
+
+- `package.json` - Root package.json for workspace management
+- `turbo.json` - Turborepo configuration
+- `README.md` - Project documentation
+- `.gitignore` - Git ignore rules
+- `.env` - Root environment variables
+- `.env.example` - Example environment variables
+
+# Module organisation
+
+- **Co-location**: Keep related files (component, tests) together in the same directory.
+- **Single responsibility**: Each module should have a clear and specific purpose.
+- **Avoid circular rependencies**: Ensure modules don't depend on each other in a circular manner.
+
+# Testing Structure & Co-location
+
+## Testing Philosophy
+
+The project follows a **co-location testing strategy** where tests live alongside their source files, making them easy to find, maintain, and understand in context.
+
+## Test Co-location Rules
+
+- **Test files** use the `.test.ts/.test.tsx` suffix
+- **Tests are placed** in the same directory as their source files
+- **Component tests** live alongside component files
+- **Utility tests** live alongside utility files
+- **Integration tests** are co-located with the modules they test
+
+### Co-location Examples
+
+```bash
+# Component co-location
+app/layout/components/MainNav/
+├── MainNav.tsx
+├── MainNav.test.tsx           # Component tests
+└── index.ts
+
+# Utility co-location
+packages/auth/src/
+├── AuthProvider.tsx
+├── AuthProvider.test.tsx       # Component tests
+├── utils.ts
+└── utils.test.ts              # Utility function tests
+
+# Package-level co-location
+packages/env-utils/src/
+├── utils.ts
+├── utils.test.ts              # Co-located utility tests
+└── index.ts
+```
+
+## Testing Framework Configuration
+
+- **Framework**: Vitest with jsdom environment
+- **Component Testing**: Testing Library for user-focused testing
+- **API Mocking**: MSW (Mock Service Worker) for integration tests
+- **Globals**: Enabled (no need to import `describe`, `it`, `expect`)
+- **Configuration**: Each package has its own `vitest.config.ts`
+
+## Test Structure Standards
+
+### Component Test Structure
+```typescript
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ComponentName } from "./ComponentName";
+
+describe("ComponentName", () => {
+  it("describes expected behavior", () => {
+    // Arrange
+    render(<ComponentName prop="value" />);
+
+    // Act & Assert
+    expect(screen.getByText("Expected Text")).toBeInTheDocument();
+  });
+});
+```
+
+### Utility Test Structure
+```typescript
+import { utilityFunction } from "./utils";
+
+describe("utilityFunction", () => {
+  it.each([
+    { input: "value1", expected: "result1" },
+    { input: "value2", expected: "result2" },
+  ])("returns $expected for $input", ({ input, expected }) => {
+    expect(utilityFunction(input)).toBe(expected);
+  });
+});
+```
+
+## Testing Best Practices
+
+- **Test user behavior**, not implementation details
+- **Use descriptive test names** that explain expected behavior
+- **Structure tests** with clear Arrange, Act, Assert sections
+- **Mock external dependencies** appropriately (prefer MSW for APIs)
+- **Keep tests independent** - each test should run in isolation
+- **Test the public interface** of components and functions

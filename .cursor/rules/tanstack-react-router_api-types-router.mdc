@@ -1,0 +1,809 @@
+---
+description: TanStack Router: API Router Types (RouterOptions, RouterState, RouterEvents)
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Router Class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createRouter`](../createRouterFunction.md) function instead.
+
+The `Router` class is used to instantiate a new router instance.
+
+## `Router` constructor
+
+The `Router` constructor accepts a single argument: the `options` that will be used to configure the router instance.
+
+### Constructor options
+
+- Type: [`RouterOptions`](../RouterOptionsType.md)
+- Required
+- The options that will be used to configure the router instance.
+
+### Constructor returns
+
+- An instance of the [`Router`](../RouterType.md).
+
+## Examples
+
+```tsx
+import { Router, RouterProvider } from '@tanstack/react-router'
+import { routeTree } from './routeTree.gen'
+
+const router = new Router({
+  routeTree,
+  defaultPreload: 'intent',
+})
+
+export default function App() {
+  return <RouterProvider router={router} />
+}
+```
+
+# RouterEvents type
+
+The `RouterEvents` type contains all of the events that the router can emit. Each top-level key of this type, represents the name of an event that the router can emit. The values of the keys are the event payloads.
+
+```tsx
+type RouterEvents = {
+  onBeforeNavigate: {
+    type: 'onBeforeNavigate'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+    hrefChanged: boolean
+  }
+  onBeforeLoad: {
+    type: 'onBeforeLoad'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+    hrefChanged: boolean
+  }
+  onLoad: {
+    type: 'onLoad'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+    hrefChanged: boolean
+  }
+  onResolved: {
+    type: 'onResolved'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+    hrefChanged: boolean
+  }
+  onBeforeRouteMount: {
+    type: 'onBeforeRouteMount'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+    pathChanged: boolean
+    hrefChanged: boolean
+  }
+  onInjectedHtml: {
+    type: 'onInjectedHtml'
+    promise: Promise<string>
+  }
+  onRendered: {
+    type: 'onRendered'
+    fromLocation?: ParsedLocation
+    toLocation: ParsedLocation
+  }
+}
+```
+
+## RouterEvents properties
+
+Once an event is emitted, the following properties will be present on the event payload.
+
+### `type` property
+
+- Type: `onBeforeNavigate | onBeforeLoad | onLoad | onBeforeRouteMount | onResolved`
+- The type of the event
+- This is useful for discriminating between events in a listener function.
+
+### `fromLocation` property
+
+- Type: [`ParsedLocation`](../ParsedLocationType.md)
+- The location that the router is transitioning from.
+
+### `toLocation` property
+
+- Type: [`ParsedLocation`](../ParsedLocationType.md)
+- The location that the router is transitioning to.
+
+### `pathChanged` property
+
+- Type: `boolean`
+- `true` if the path has changed between the `fromLocation` and `toLocation`.
+
+### `hrefChanged` property
+
+- Type: `boolean`
+- `true` if the href has changed between the `fromLocation` and `toLocation`.
+
+## Example
+
+```tsx
+import { createRouter } from '@tanstack/react-router'
+import { routeTree } from './routeTree.gen'
+
+const router = createRouter({ routeTree })
+
+const unsub = router.subscribe('onResolved', (evt) => {
+  // ...
+})
+```
+
+# RouterOptions
+
+The `RouterOptions` type contains all of the options that can be used to configure a router instance.
+
+## RouterOptions properties
+
+The `RouterOptions` type accepts an object with the following properties and methods:
+
+### `routeTree` property
+
+- Type: `AnyRoute`
+- Required
+- The route tree that will be used to configure the router instance.
+
+### `history` property
+
+- Type: `RouterHistory`
+- Optional
+- The history object that will be used to manage the browser history. If not provided, a new `createBrowserHistory` instance will be created and used.
+
+### `stringifySearch` method
+
+- Type: `(search: Record<string, any>) => string`
+- Optional
+- A function that will be used to stringify search params when generating links.
+- Defaults to `defaultStringifySearch`.
+
+### `parseSearch` method
+
+- Type: `(search: string) => Record<string, any>`
+- Optional
+- A function that will be used to parse search params when parsing the current location.
+- Defaults to `defaultParseSearch`.
+
+### `search.strict` property
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`
+- Configures how unknown search params (= not returned by any `validateSearch`) are treated.
+- If `false`, unknown search params will be kept.
+- If `true`, unknown search params will be removed.
+
+### `defaultPreload` property
+
+- Type: `undefined | false | 'intent' | 'viewport' | 'render'`
+- Optional
+- Defaults to `false`
+- If `false`, routes will not be preloaded by default in any way.
+- If `'intent'`, routes will be preloaded by default when the user hovers over a link or a `touchstart` event is detected on a `<Link>`.
+- If `'viewport'`, routes will be preloaded by default when they are within the viewport of the browser.
+- If `'render'`, routes will be preloaded by default as soon as they are rendered in the DOM.
+
+### `defaultPreloadDelay` property
+
+- Type: `number`
+- Optional
+- Defaults to `50`
+- The delay in milliseconds that a route must be hovered over or touched before it is preloaded.
+
+### `defaultComponent` property
+
+- Type: `RouteComponent`
+- Optional
+- Defaults to `Outlet`
+- The default `component` a route should use if no component is provided.
+
+### `defaultErrorComponent` property
+
+- Type: `RouteComponent`
+- Optional
+- Defaults to `ErrorComponent`
+- The default `errorComponent` a route should use if no error component is provided.
+
+### `defaultNotFoundComponent` property
+
+- Type: `NotFoundRouteComponent`
+- Optional
+- Defaults to `NotFound`
+- The default `notFoundComponent` a route should use if no notFound component is provided.
+
+### `defaultPendingComponent` property
+
+- Type: `RouteComponent`
+- Optional
+- The default `pendingComponent` a route should use if no pending component is provided.
+
+### `defaultPendingMs` property
+
+- Type: `number`
+- Optional
+- Defaults to `1000`
+- The default `pendingMs` a route should use if no pendingMs is provided.
+
+### `defaultPendingMinMs` property
+
+- Type: `number`
+- Optional
+- Defaults to `500`
+- The default `pendingMinMs` a route should use if no pendingMinMs is provided.
+
+### `defaultStaleTime` property
+
+- Type: `number`
+- Optional
+- Defaults to `0`
+- The default `staleTime` a route should use if no staleTime is provided.
+
+### `defaultPreloadStaleTime` property
+
+- Type: `number`
+- Optional
+- Defaults to `30_000` ms (30 seconds)
+- The default `preloadStaleTime` a route should use if no preloadStaleTime is provided.
+
+### `defaultPreloadGcTime` property
+
+- Type: `number`
+- Optional
+- Defaults to `routerOptions.defaultGcTime`, which defaults to 30 minutes.
+- The default `preloadGcTime` a route should use if no preloadGcTime is provided.
+
+### `defaultGcTime` property
+
+- Type: `number`
+- Optional
+- Defaults to 30 minutes.
+- The default `gcTime` a route should use if no gcTime is provided.
+
+### `defaultOnCatch` property
+
+- Type: `(error: Error, errorInfo: ErrorInfo) => void`
+- Optional
+- The default `onCatch` handler for errors caught by the Router ErrorBoundary
+
+### `defaultViewTransition` property
+
+- Type: `boolean | ViewTransitionOptions`
+- Optional
+- If `true`, route navigations will be called using `document.startViewTransition()`.
+- If [`ViewTransitionOptions`](../ViewTransitionOptionsType.md), route navigations will be called using `document.startViewTransition({update, types})`
+  where `types` will be the strings array passed with `ViewTransitionOptions["types"]`. If the browser does not support viewTransition types,
+  the navigation will fall back to normal `document.startTransition()`, same as if `true` was passed.
+- If the browser does not support this api, this option will be ignored.
+- See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition) for more information on how this function works.
+- See [Google](https://developer.chrome.com/docs/web-platform/view-transitions/same-document#view-transition-types) for more information on viewTransition types
+
+### `defaultHashScrollIntoView` property
+
+- Type: `boolean | ScrollIntoViewOptions`
+- Optional
+- Defaults to `true` so the element with an id matching the hash will be scrolled into view after the location is committed to history.
+- If `false`, the element with an id matching the hash will not be scrolled into view after the location is committed to history.
+- If an object is provided, it will be passed to the `scrollIntoView` method as options.
+- See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) for more information on `ScrollIntoViewOptions`.
+
+### `caseSensitive` property
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`
+- If `true`, all routes will be matched as case-sensitive.
+
+### `basepath` property
+
+- Type: `string`
+- Optional
+- Defaults to `/`
+- The basepath for then entire router. This is useful for mounting a router instance at a subpath.
+
+### `context` property
+
+- Type: `any`
+- Optional or required if the root route was created with [`createRootRouteWithContext()`](../createRootRouteWithContextFunction.md).
+- The root context that will be provided to all routes in the route tree. This can be used to provide a context to all routes in the tree without having to provide it to each route individually.
+
+### `dehydrate` method
+
+- Type: `() => TDehydrated`
+- Optional
+- A function that will be called when the router is dehydrated. The return value of this function will be serialized and stored in the router's dehydrated state.
+
+### `hydrate` method
+
+- Type: `(dehydrated: TDehydrated) => void`
+- Optional
+- A function that will be called when the router is hydrated. The return value of this function will be serialized and stored in the router's dehydrated state.
+
+### `routeMasks` property
+
+- Type: `RouteMask[]`
+- Optional
+- An array of route masks that will be used to mask routes in the route tree. Route masking is when you display a route at a different path than the one it is configured to match, like a modal popup that when shared will unmask to the modal's content instead of the modal's context.
+
+### `unmaskOnReload` property
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`
+- If `true`, route masks will, by default, be removed when the page is reloaded. This can be overridden on a per-mask basis by setting the `unmaskOnReload` option on the mask, or on a per-navigation basis by setting the `unmaskOnReload` option in the `Navigate` options.
+
+### `Wrap` property
+
+- Type: `React.Component`
+- Optional
+- A component that will be used to wrap the entire router. This is useful for providing a context to the entire router. Only non-DOM-rendering components like providers should be used, anything else will cause a hydration error.
+
+**Example**
+
+```tsx
+import { createRouter } from '@tanstack/react-router'
+
+const router = createRouter({
+  // ...
+  Wrap: ({ children }) => {
+    return <MyContext.Provider value={myContext}>{children}</MyContext>
+  },
+})
+```
+
+### `InnerWrap` property
+
+- Type: `React.Component`
+- Optional
+- A component that will be used to wrap the inner contents of the router. This is useful for providing a context to the inner contents of the router where you also need access to the router context and hooks. Only non-DOM-rendering components like providers should be used, anything else will cause a hydration error.
+
+**Example**
+
+```tsx
+import { createRouter } from '@tanstack/react-router'
+
+const router = createRouter({
+  // ...
+  InnerWrap: ({ children }) => {
+    const routerState = useRouterState()
+
+    return (
+      <MyContext.Provider value={myContext}>
+        {children}
+      </MyContext>
+    )
+  },
+})
+```
+
+### `notFoundMode` property
+
+- Type: `'root' | 'fuzzy'`
+- Optional
+- Defaults to `'fuzzy'`
+- This property controls how TanStack Router will handle scenarios where it cannot find a route to match the current location. See the [Not Found Errors guide](../../../guide/not-found-errors.md) for more information.
+
+### `notFoundRoute` property
+
+- **Deprecated**
+- Type: `NotFoundRoute`
+- Optional
+- A route that will be used as the default not found route for every branch of the route tree. This can be overridden on a per-branch basis by providing a not found route to the `NotFoundRoute` option on the root route of the branch.
+
+### `errorSerializer` property
+
+- Type: [`RouterErrorSerializer`]
+- Optional
+- The serializer object that will be used to determine how errors are serialized and deserialized between the server and the client.
+
+#### `errorSerializer.serialize` method
+
+- Type: `(err: unknown) => TSerializedError`
+- This method is called to define how errors are serialized when they are stored in the router's dehydrated state.
+
+#### `errorSerializer.deserialize` method
+
+- Type: `(err: TSerializedError) => unknown`
+- This method is called to define how errors are deserialized from the router's dehydrated state.
+
+### `trailingSlash` property
+
+- Type: `'always' | 'never' | 'preserve'`
+- Optional
+- Defaults to `never`
+- Configures how trailing slashes are treated. `'always'` will add a trailing slash if not present, `'never'` will remove the trailing slash if present and `'preserve'` will not modify the trailing slash.
+
+### `pathParamsAllowedCharacters` property
+
+- Type: `Array<';' | ':' | '@' | '&' | '=' | '+' | '$' | ','>`
+- Optional
+- Configures which URI characters are allowed in path params that would ordinarily be escaped by encodeURIComponent.
+
+### `defaultStructuralSharing` property
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`
+- Configures whether structural sharing is enabled by default for fine-grained selectors.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+### `defaultRemountDeps` property
+
+- Type:
+
+```tsx
+type defaultRemountDeps = (opts: RemountDepsOptions) => any
+
+interface RemountDepsOptions<
+  in out TRouteId,
+  in out TFullSearchSchema,
+  in out TAllParams,
+  in out TLoaderDeps,
+> {
+  routeId: TRouteId
+  search: TFullSearchSchema
+  params: TAllParams
+  loaderDeps: TLoaderDeps
+}
+```
+
+- Optional
+- A default function that will be called to determine whether a route component shall be remounted after navigation. If this function returns a different value than previously, it will remount.
+- The return value needs to be JSON serializable.
+- By default, a route component will not be remounted if it stays active after a navigation
+
+Example:  
+If you want to configure to remount all route components upon `params` change, use:
+
+```tsx
+remountDeps: ({ params }) => params
+```
+
+# RouterState type
+
+The `RouterState` type represents shape of the internal state of the router. The Router's internal state is useful, if you need to access certain internals of the router, such as any pending matches, is the router in its loading state, etc.
+
+```tsx
+type RouterState = {
+  status: 'pending' | 'idle'
+  isLoading: boolean
+  isTransitioning: boolean
+  matches: Array<RouteMatch>
+  pendingMatches: Array<RouteMatch>
+  location: ParsedLocation
+  resolvedLocation: ParsedLocation
+}
+```
+
+## RouterState properties
+
+The `RouterState` type contains all of the properties that are available on the router state.
+
+### `status` property
+
+- Type: `'pending' | 'idle'`
+- The current status of the router. If the router is pending, it means that it is currently loading a route or the router is still transitioning to the new route.
+
+### `isLoading` property
+
+- Type: `boolean`
+- `true` if the router is currently loading a route or waiting for a route to finish loading.
+
+### `isTransitioning` property
+
+- Type: `boolean`
+- `true` if the router is currently transitioning to a new route.
+
+### `matches` property
+
+- Type: [`Array<RouteMatch>`](../RouteMatchType.md)
+- An array of all of the route matches that have been resolved and are currently active.
+
+### `pendingMatches` property
+
+- Type: [`Array<RouteMatch>`](../RouteMatchType.md)
+- An array of all of the route matches that are currently pending.
+
+### `location` property
+
+- Type: [`ParsedLocation`](../ParsedLocationType.md)
+- The latest location that the router has parsed from the browser history. This location may not be resolved and loaded yet.
+
+### `resolvedLocation` property
+
+- Type: [`ParsedLocation`](../ParsedLocationType.md)
+- The location that the router has resolved and loaded.
+
+# Router type
+
+The `Router` type is used to describe a router instance.
+
+## `Router` properties and methods
+
+An instance of the `Router` has the following properties and methods:
+
+### `.update` method
+
+- Type: `(newOptions: RouterOptions) => void`
+- Updates the router instance with new options.
+
+### `state` property
+
+- Type: [`RouterState`](../RouterStateType.md)
+- The current state of the router.
+
+> ⚠️⚠️⚠️ **`router.state` is always up to date, but NOT REACTIVE. If you use `router.state` in a component, the component will not re-render when the router state changes. To get a reactive version of the router state, use the [`useRouterState`](../useRouterStateHook.md) hook.**
+
+### `.subscribe` method
+
+- Type: `(eventType: TType, fn: ListenerFn<RouterEvents[TType]>) => (event: RouterEvent) => void`
+- Subscribes to a [`RouterEvent`](../RouterEventsType.md).
+- Returns a function that can be used to unsubscribe from the event.
+- The callback provided to the returned function will be called with the event that was emitted.
+
+### `.matchRoutes` method
+
+- Type: `(pathname: string, locationSearch: Record<string, any>, opts?: { throwOnError?: boolean; }) => RouteMatch[]`
+- Matches a pathname and search params against the router's route tree and returns an array of route matches.
+- If `opts.throwOnError` is `true`, any errors that occur during the matching process will be thrown (in addition to being returned in the route match's `error` property).
+
+### `.cancelMatch` method
+
+- Type: `(matchId: string) => void`
+- Cancels a route match that is currently pending by calling `match.abortController.abort()`.
+
+### `.cancelMatches` method
+
+- Type: `() => void`
+- Cancels all route matches that are currently pending by calling `match.abortController.abort()` on each one.
+
+### `.buildLocation` method
+
+Builds a new parsed location object that can be used later to navigate to a new location.
+
+- Type: `(opts: BuildNextOptions) => ParsedLocation`
+- Properties
+  - `from`
+    - Type: `string`
+    - Optional
+    - The path to navigate from. If not provided, the current path will be used.
+  - `to`
+    - Type: `string | number | null`
+    - Optional
+    - The path to navigate to. If `null`, the current path will be used.
+  - `params`
+    - Type: `true | Updater<unknown>`
+    - Optional
+    - If `true`, the current params will be used. If a function is provided, it will be called with the current params and the return value will be used.
+  - `search`
+    - Type: `true | Updater<unknown>`
+    - Optional
+    - If `true`, the current search params will be used. If a function is provided, it will be called with the current search params and the return value will be used.
+  - `hash`
+    - Type: `true | Updater<string>`
+    - Optional
+    - If `true`, the current hash will be used. If a function is provided, it will be called with the current hash and the return value will be used.
+  - `state`
+    - Type: `true | NonNullableUpdater<ParsedHistoryState, HistoryState>`
+    - Optional
+    - If `true`, the current state will be used. If a function is provided, it will be called with the current state and the return value will be used.
+  - `mask`
+    - Type: `object`
+    - Optional
+    - Contains all of the same BuildNextOptions, with the addition of `unmaskOnReload`.
+    - `unmaskOnReload`
+      - Type: `boolean`
+      - Optional
+      - If `true`, the route mask will be removed when the page is reloaded. This can be overridden on a per-navigation basis by setting the `unmaskOnReload` option in the `Navigate` options.
+
+### `.commitLocation` method
+
+Commits a new location object to the browser history.
+
+- Type
+  ```tsx
+  type commitLocation = (
+    location: ParsedLocation & {
+      replace?: boolean
+      resetScroll?: boolean
+      hashScrollIntoView?: boolean | ScrollIntoViewOptions
+      ignoreBlocker?: boolean
+    },
+  ) => Promise<void>
+  ```
+- Properties
+  - `location`
+    - Type: [`ParsedLocation`](../ParsedLocationType.md)
+    - Required
+    - The location to commit to the browser history.
+  - `replace`
+    - Type: `boolean`
+    - Optional
+    - Defaults to `false`.
+    - If `true`, the location will be committed to the browser history using `history.replace` instead of `history.push`.
+  - `resetScroll`
+    - Type: `boolean`
+    - Optional
+    - Defaults to `true` so that the scroll position will be reset to 0,0 after the location is committed to the browser history.
+    - If `false`, the scroll position will not be reset to 0,0 after the location is committed to history.
+  - `hashScrollIntoView`
+    - Type: `boolean | ScrollIntoViewOptions`
+    - Optional
+    - Defaults to `true` so the element with an id matching the hash will be scrolled into view after the location is committed to history.
+    - If `false`, the element with an id matching the hash will not be scrolled into view after the location is committed to history.
+    - If an object is provided, it will be passed to the `scrollIntoView` method as options.
+    - See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) for more information on `ScrollIntoViewOptions`.
+  - `ignoreBlocker`
+    - Type: `boolean`
+    - Optional
+    - Defaults to `false`.
+    - If `true`, navigation will ignore any blockers that might prevent it.
+
+### `.navigate` method
+
+Navigates to a new location.
+
+- Type
+  ```tsx
+  type navigate = (options: NavigateOptions) => Promise<void>
+  ```
+
+### `.invalidate` method
+
+Invalidates route matches by forcing their `beforeLoad` and `load` functions to be called again.
+
+- Type: `(opts?: {filter?: (d: MakeRouteMatchUnion<TRouter>) => boolean, sync?: boolean}) => Promise<void>`
+- This is useful any time your loader data might be out of date or stale. For example, if you have a route that displays a list of posts, and you have a loader function that fetches the list of posts from an API, you might want to invalidate the route matches for that route any time a new post is created so that the list of posts is always up-to-date.
+- if `filter` is not supplied, all matches will be invalidated
+- if `filter` is supplied, only matches for which `filter` returns `true` will be invalidated.
+- if `sync` is true, the promise returned by this function will only resolve once all loaders have finished.
+- You might also want to invalidate the Router if you imperatively `reset` the router's `CatchBoundary` to trigger loaders again.
+
+### `.clearCache` method
+
+Remove cached route matches.
+
+- Type: `(opts?: {filter?: (d: MakeRouteMatchUnion<TRouter>) => boolean}) => void`
+- if `filter` is not supplied, all cached matches will be removed
+- if `filter` is supplied, only matches for which `filter` returns `true` will be removed.
+
+### `.load` method
+
+Loads all of the currently matched route matches and resolves when they are all loaded and ready to be rendered.
+
+> ⚠️⚠️⚠️ **`router.load()` respects `route.staleTime` and will not forcefully reload a route match if it is still fresh. If you need to forcefully reload a route match, use `router.invalidate()` instead.**
+
+- Type: `(opts?: {sync?: boolean}) => Promise<void>`
+- if `sync` is true, the promise returned by this function will only resolve once all loaders have finished.
+- The most common use case for this method is to call it when doing SSR to ensure that all of the critical data for the current route is loaded before attempting to stream or render the application to the client.
+
+### `.preloadRoute` method
+
+Preloads all of the matches that match the provided `NavigateOptions`.
+
+> ⚠️⚠️⚠️ **Preloaded route matches are not stored long-term in the router state. They are only stored until the next attempted navigation action.**
+
+- Type: `(opts?: NavigateOptions) => Promise<RouteMatch[]>`
+- Properties
+  - `opts`
+    - Type: `NavigateOptions`
+    - Optional, defaults to the current location.
+    - The options that will be used to determine which route matches to preload.
+- Returns
+  - A promise that resolves with an array of all of the route matches that were preloaded.
+
+### `.loadRouteChunk` method
+
+Loads the JS chunk of the route.
+
+- Type: `(route: AnyRoute) => Promise<void>`
+
+### `.matchRoute` method
+
+Matches a pathname and search params against the router's route tree and returns a route match's params or false if no match was found.
+
+- Type: `(dest: ToOptions, matchOpts?: MatchRouteOptions) => RouteMatch['params'] | false`
+- Properties
+  - `dest`
+    - Type: `ToOptions`
+    - Required
+    - The destination to match against.
+  - `matchOpts`
+    - Type: `MatchRouteOptions`
+    - Optional
+    - Options that will be used to match the destination.
+- Returns
+  - A route match's params if a match was found.
+  - `false` if no match was found.
+
+### `.dehydrate` method
+
+Dehydrates the router's critical state into a serializable object that can be sent to the client in an initial request.
+
+- Type: `() => DehydratedRouter`
+- Returns
+  - A serializable object that contains the router's critical state.
+
+### `.hydrate` method
+
+Hydrates the router's critical state from a serializable object that was sent from the server in an initial request.
+
+- Type: `(dehydrated: DehydratedRouter) => void`
+- Properties
+  - `dehydrated`
+    - Type: `DehydratedRouter`
+    - Required
+    - The dehydrated router state that was sent from the server.
+
+# ToMaskOptions type
+
+The `ToMaskOptions` type extends the [`ToOptions`](../ToOptionsType.md) type and describes additional options available when using route masks.
+
+```tsx
+type ToMaskOptions = ToOptions & {
+  unmaskOnReload?: boolean
+}
+```
+
+- [`ToOptions`](../ToOptionsType.md)
+
+# ToOptions type
+
+The `ToOptions` type contains several properties that can be used to describe a router destination.
+
+```tsx
+type ToOptions = {
+  from?: ValidRoutePath | string
+  to?: ValidRoutePath | string
+  hash?: true | string | ((prev?: string) => string)
+  state?: true | HistoryState | ((prev: HistoryState) => HistoryState)
+} & SearchParamOptions &
+  PathParamOptions
+
+type SearchParamOptions = {
+  search?: true | TToSearch | ((prev: TFromSearch) => TToSearch)
+}
+
+type PathParamOptions = {
+  path?: true | Record<string, TPathParam> | ((prev: TFromParams) => TToParams)
+}
+```
+
+# UseMatchRouteOptions type
+
+The `UseMatchRouteOptions` type extends the [`ToOptions`](../ToOptionsType.md) type and describes additional options available when using the [`useMatchRoute`](../useMatchRouteHook.md) hook.
+
+```tsx
+export type UseMatchRouteOptions = ToOptions & MatchRouteOptions
+```
+
+- [`ToOptions`](../ToOptionsType.md)
+- [`MatchRouteOptions`](../MatchRouteOptionsType.md)
+
+# ViewTransitionOptions type
+
+The `ViewTransitionOptions` type is used to define a
+[viewTransition type](https://developer.chrome.com/docs/web-platform/view-transitions/same-document#view-transition-types).
+
+```tsx
+interface ViewTransitionOptions {
+  types: Array<string>
+}
+```
+
+## ViewTransitionOptions properties
+
+The `ViewTransitionOptions` type accepts an object with a single property:
+
+### `types` property
+
+- Type: `Array<string>`
+- Required
+- The types array that will be passed to the `document.startViewTransition({update, types}) call`;
+

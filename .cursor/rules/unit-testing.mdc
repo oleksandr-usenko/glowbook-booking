@@ -1,0 +1,153 @@
+# Unit Testing Rules
+
+## Mother Objects
+
+- Always use mother objects from `@/test-utils/object-mother` to generate mock data for API responses and test setup.
+- Example:
+
+```ts
+import { RequirementMother } from "@/test-utils";
+const requirement = RequirementMother.sample;
+server.use(
+  httpMock.get("/companies/:companyId/requirements/:requirementId", () => {
+    return HttpResponse.json(requirement);
+  }),
+);
+```
+
+## API Mocking Strategy
+
+- **Use existing handlers**: Check if API endpoints are already mocked in `@test-utils/dev-server/handlers/` files
+- **Avoid redundant mocking**: Don't mock endpoints that are already handled by existing handlers
+- **Only mock error cases**: Only add `server.use()` for specific error scenarios or edge cases
+- **Handler organization**: Group related API handlers in dedicated files (e.g., `requirements.ts`, `sites.ts`)
+
+### Handler File Structure
+
+```typescript
+// Example: test-utils/dev-server/handlers/requirements.ts
+export const requirementHandlers = [
+  httpMock.get("/companies/:companyId/requirements", async () => {
+    return HttpResponse.json(createPagedResponse(requirements));
+  }),
+  httpMock.get("/companies/:companyId/requirements/:requirementId", async ({ params }) => {
+    // Handler logic
+  }),
+  // ... other handlers
+];
+```
+
+### Test File Pattern
+
+```typescript
+// ✅ Good - Uses existing handlers, only mocks error cases
+describe("EditRequirementRoute", () => {
+  it("renders form and submits successfully", async () => {
+    // No mocking needed - handlers already exist
+    await renderRouter({ initialPath: `/requirements/${id}/edit` });
+    // Test logic
+  });
+
+  it("shows error when API fails", async () => {
+    // Only mock the specific error case
+    server.use(
+      httpMock.put("/companies/:companyId/requirements/:requirementId", () => {
+        return HttpResponse.json(null, { status: 500 });
+      }),
+    );
+    // Test logic
+  });
+});
+```
+
+### Guidelines
+
+- **Check handlers first**: Always check existing handler files before adding new mocks
+- **Add missing handlers**: If an endpoint isn't mocked, add it to the appropriate handler file
+- **Keep tests clean**: Remove unnecessary mocking from test files
+- **Document patterns**: Use consistent patterns across all test files
+
+## Translations for Assertions
+
+- Always use translations from the appropriate i18n file for assertions.
+- Import translations as:
+
+```ts
+import configurationTranslations from "@/public/i18n/en/configuration.json";
+const translations = configurationTranslations.requirements;
+```
+
+- Use translation values in assertions:
+
+```ts
+const nameInput = screen.getByLabelText(translations.form.edit.fields.name);
+expect(await screen.findByText(translations.form.validation.name.required)).toBeInTheDocument();
+```
+
+- Use translation values with parameters in assertions:
+
+```ts
+const maxLength = 50;
+const errorMessage = translations.form.validation.name.maxLength({ max: maxLength });
+expect(await screen.findByText(errorMessage)).toBeInTheDocument();
+```
+
+- This ensures your tests are robust against translation changes and always match the UI.
+
+# Unit tests
+
+- Only use `vitest` for testing.
+- Test files will have `*.test.ts` suffix.
+- Tests are colocated next to the source file.
+  - Example: `utils/navigation.ts` and `utils/navigation.test.ts`.
+- For frontend code, test user interactions not implementations.
+- Do not mock API calls, use msw endpoints instead.
+
+## Test best practices
+
+- Each test should be independent and not rely on the state left by another test.
+- Keep tests focused: test only one behavior or scenario per test case.
+- Clean up any side effects created during the test, either manually or using beforeEach, afterEach hooks.
+- Prefer using built-in assertion methods and avoid custom assertions unless necessary.
+- Only document any non-obvious test logic with comments.
+
+## Test syntax
+
+- Do not import things like `describe`, `it`, `expect`, etc... use vitest globals.
+- Use describe to define the Component, Stack or Construct under test.
+- Do not use `test` for test cases, use `it`.
+- Do not use `should` notation; use clear, descriptive statements for test names.
+- Structure the code of a test by separating it into Arrange, Act, and Assert sections.
+- Do not add the usual comments developers add for separating the Arrange, Act, and Assert sections.
+
+## Example
+
+Use this template when creating unit tests:
+
+```ts
+import { Template } from "aws-cdk-lib/assertions";
+import { App } from "aws-cdk-lib";
+import { MyStack } from "../lib/my-stack";
+
+describe("MyStack", () => {
+  it("matches snapshot", () => {
+    const app = new App();
+    const stack = new MyStack(app, "TestStack");
+
+    const template = Template.fromStack(stack);
+
+    expect(template.toJSON()).toMatchSnapshot();
+  });
+});
+```
+
+    const template = Template.fromStack(stack);
+
+    expect(template.toJSON()).toMatchSnapshot();
+
+});
+});
+
+```
+
+```

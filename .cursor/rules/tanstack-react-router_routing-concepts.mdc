@@ -1,0 +1,914 @@
+---
+description: TanStack Router: Route Matching and Concepts
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Route Matching
+
+Route matching follows a consistent and predictable pattern. This guide will explain how route trees are matched.
+
+When TanStack Router processes your route tree, all of your routes are automatically sorted to match the most specific routes first. This means that regardless of the order your route tree is defined, routes will always be sorted in this order:
+
+- Index Route
+- Static Routes (most specific to least specific)
+- Dynamic Routes (longest to shortest)
+- Splat/Wildcard Routes
+
+Consider the following pseudo route tree:
+
+```
+Root
+  - blog
+    - $postId
+    - /
+    - new
+  - /
+  - *
+  - about
+  - about/us
+```
+
+After sorting, this route tree will become:
+
+```
+Root
+  - /
+  - about/us
+  - about
+  - blog
+    - /
+    - new
+    - $postId
+  - *
+```
+
+This final order represents the order in which routes will be matched based on specificity.
+
+Using that route tree, let's follow the matching process for a few different URLs:
+
+- `/blog`
+  ```
+  Root
+    ❌ /
+    ❌ about/us
+    ❌ about
+    ⏩ blog
+      ✅ /
+      - new
+      - $postId
+    - *
+  ```
+- `/blog/my-post`
+  ```
+  Root
+    ❌ /
+    ❌ about/us
+    ❌ about
+    ⏩ blog
+      ❌ /
+      ❌ new
+      ✅ $postId
+    - *
+  ```
+- `/`
+  ```
+  Root
+    ✅ /
+    - about/us
+    - about
+    - blog
+      - /
+      - new
+      - $postId
+    - *
+  ```
+- `/not-a-route`
+  ```
+  Root
+    ❌ /
+    ❌ about/us
+    ❌ about
+    ❌ blog
+      - /
+      - new
+      - $postId
+    ✅ *
+  ```
+
+# Route Trees
+
+TanStack Router uses a nested route tree to match up the URL with the correct component tree to render.
+
+To build a route tree, TanStack Router supports:
+
+- [File-Based Routing](../file-based-routing.md)
+- [Code-Based Routing](../code-based-routing.md)
+
+Both methods support the exact same core features and functionality, but **file-based routing requires less code for the same or better results**. For this reason, **file-based routing is the preferred and recommended way** to configure TanStack Router. Most of the documentation is written from the perspective of file-based routing.
+
+## Route Trees
+
+Nested routing is a powerful concept that allows you to use a URL to render a nested component tree. For example, given the URL of `/blog/posts/123`, you could create a route hierarchy that looks like this:
+
+```tsx
+├── blog
+│   ├── posts
+│   │   ├── $postId
+```
+
+And render a component tree that looks like this:
+
+```tsx
+<Blog>
+  <Posts>
+    <Post postId="123" />
+  </Posts>
+</Blog>
+```
+
+Let's take that concept and expand it out to a larger site structure, but with file-names now:
+
+```
+/routes
+├── __root.tsx
+├── index.tsx
+├── about.tsx
+├── posts/
+│   ├── index.tsx
+│   ├── $postId.tsx
+├── posts.$postId.edit.tsx
+├── settings/
+│   ├── profile.tsx
+│   ├── notifications.tsx
+├── _pathlessLayout/
+│   ├── route-a.tsx
+├── ├── route-b.tsx
+├── files/
+│   ├── $.tsx
+```
+
+The above is a valid route tree configuration that can be used with TanStack Router! There's a lot of power and convention to unpack with file-based routing, so let's break it down a bit.
+
+## Route Tree Configuration
+
+Route trees can be configured using a few different ways:
+
+- [Flat Routes](../file-based-routing.md#flat-routes)
+- [Directories](../file-based-routing.md#directory-routes)
+- [Mixed Flat Routes and Directories](../file-based-routing.md#mixed-flat-and-directory-routes)
+- [Virtual File Routes](../virtual-file-routes.md)
+- [Code-Based Routes](../code-based-routing.md)
+
+Please be sure to check out the full documentation links above for each type of route tree, or just proceed to the next section to get started with file-based routing.
+
+# Routing Concepts
+
+TanStack Router supports a number of powerful routing concepts that allow you to build complex and dynamic routing systems with ease.
+
+Each of these concepts is useful and powerful, and we'll dive into each of them in the following sections.
+
+## Anatomy of a Route
+
+All other routes, other than the [Root Route](#the-root-route), are configured using the `createFileRoute` function, which provides type safety when using file-based routing:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  component: PostsComponent,
+})
+```
+
+The `createFileRoute` function takes a single argument, the file-route's path as a string.
+
+**❓❓❓ "Wait, you're making me pass the path of the route file to `createFileRoute`?"**
+
+Yes! But don't worry, this path is **automatically written and managed by the router for you via the TanStack Router Bundler Plugin or Router CLI.** So, as you create new routes, move routes around or rename routes, the path will be updated for you automatically.
+
+The reason for this pathname has everything to do with the magical type safety of TanStack Router. Without this pathname, TypeScript would have no idea what file we're in! (We wish TypeScript had a built-in for this, but they don't yet 🤷‍♂️)
+
+## The Root Route
+
+The root route is the top-most route in the entire tree and encapsulates all other routes as children.
+
+- It has no path
+- It is **always** matched
+- Its `component` is **always** rendered
+
+Even though it doesn't have a path, the root route has access to all of the same functionality as other routes including:
+
+- components
+- loaders
+- search param validation
+- etc.
+
+To create a root route, call the `createRootRoute()` function and export it as the `Route` variable in your route file:
+
+```tsx
+// Standard root route
+import { createRootRoute } from '@tanstack/react-router'
+
+export const Route = createRootRoute()
+
+// Root route with Context
+import { createRootRouteWithContext } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
+
+export interface MyRouterContext {
+  queryClient: QueryClient
+}
+export const Route = createRootRouteWithContext<MyRouterContext>()
+```
+
+To learn more about Context in TanStack Router, see the [Router Context](../../guide/router-context.md) guide.
+
+## Basic Routes
+
+Basic routes match a specific path, for example `/about`, `/settings`, `/settings/notifications` are all basic routes, as they match the path exactly.
+
+Let's take a look at an `/about` route:
+
+```tsx
+// about.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  component: AboutComponent,
+})
+
+function AboutComponent() {
+  return <div>About</div>
+}
+```
+
+Basic routes are simple and straightforward. They match the path exactly and render the provided component.
+
+## Index Routes
+
+Index routes specifically target their parent route when it is **matched exactly and no child route is matched**.
+
+Let's take a look at an index route for a `/posts` URL:
+
+```tsx
+// posts.index.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+// Note the trailing slash, which is used to target index routes
+export const Route = createFileRoute({
+  component: PostsIndexComponent,
+})
+
+function PostsIndexComponent() {
+  return <div>Please select a post!</div>
+}
+```
+
+This route will be matched when the URL is `/posts` exactly.
+
+## Dynamic Route Segments
+
+Route path segments that start with a `$` followed by a label are dynamic and capture that section of the URL into the `params` object for use in your application. For example, a pathname of `/posts/123` would match the `/posts/$postId` route, and the `params` object would be `{ postId: '123' }`.
+
+These params are then usable in your route's configuration and components! Let's look at a `posts.$postId.tsx` route:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  // In a loader
+  loader: ({ params }) => fetchPost(params.postId),
+  // Or in a component
+  component: PostComponent,
+})
+
+function PostComponent() {
+  // In a component!
+  const { postId } = Route.useParams()
+  return <div>Post ID: {postId}</div>
+}
+```
+
+> 🧠 Dynamic segments work at **each** segment of the path. For example, you could have a route with the path of `/posts/$postId/$revisionId` and each `$` segment would be captured into the `params` object.
+
+## Splat / Catch-All Routes
+
+A route with a path of only `$` is called a "splat" route because it _always_ captures _any_ remaining section of the URL pathname from the `$` to the end. The captured pathname is then available in the `params` object under the special `_splat` property.
+
+For example, a route targeting the `files/$` path is a splat route. If the URL pathname is `/files/documents/hello-world`, the `params` object would contain `documents/hello-world` under the special `_splat` property:
+
+```js
+{
+  '_splat': 'documents/hello-world'
+}
+```
+
+> ⚠️ In v1 of the router, splat routes are also denoted with a `*` instead of a `_splat` key for backwards compatibility. This will be removed in v2.
+
+> 🧠 Why use `$`? Thanks to tools like Remix, we know that despite `*`s being the most common character to represent a wildcard, they do not play nice with filenames or CLI tools, so just like them, we decided to use `$` instead.
+
+## Layout Routes
+
+Layout routes are used to wrap child routes with additional components and logic. They are useful for:
+
+- Wrapping child routes with a layout component
+- Enforcing a `loader` requirement before displaying any child routes
+- Validating and providing search params to child routes
+- Providing fallbacks for error components or pending elements to child routes
+- Providing shared context to all child routes
+- And more!
+
+Let's take a look at an example layout route called `app.tsx`:
+
+```
+routes/
+├── app.tsx
+├── app.dashboard.tsx
+├── app.settings.tsx
+```
+
+In the tree above, `app.tsx` is a layout route that wraps two child routes, `app.dashboard.tsx` and `app.settings.tsx`.
+
+This tree structure is used to wrap the child routes with a layout component:
+
+```tsx
+import { Outlet, createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  component: AppLayoutComponent,
+})
+
+function AppLayoutComponent() {
+  return (
+    <div>
+      <h1>App Layout</h1>
+      <Outlet />
+    </div>
+  )
+}
+```
+
+The following table shows which component(s) will be rendered based on the URL:
+
+| URL Path         | Component                |
+| ---------------- | ------------------------ |
+| `/`              | `<Index>`                |
+| `/app/dashboard` | `<AppLayout><Dashboard>` |
+| `/app/settings`  | `<AppLayout><Settings>`  |
+
+Since TanStack Router supports mixed flat and directory routes, you can also express your application's routing using layout routes within directories:
+
+```
+routes/
+├── app/
+│   ├── route.tsx
+│   ├── dashboard.tsx
+│   ├── settings.tsx
+```
+
+In this nested tree, the `app/route.tsx` file is a configuration for the layout route that wraps two child routes, `app/dashboard.tsx` and `app/settings.tsx`.
+
+Layout Routes also let you enforce component and loader logic for Dynamic Route Segments:
+
+```
+routes/
+├── app/users/
+│   ├── $userId/
+|   |   ├── route.tsx
+|   |   ├── index.tsx
+|   |   ├── edit.tsx
+```
+
+## Pathless Layout Routes
+
+Like [Layout Routes](#layout-routes), Pathless Layout Routes are used to wrap child routes with additional components and logic. However, pathless layout routes do not require a matching `path` in the URL and are used to wrap child routes with additional components and logic without requiring a matching `path` in the URL.
+
+Pathless Layout Routes are prefixed with an underscore (`_`) to denote that they are "pathless".
+
+> 🧠 The part of the path after the `_` prefix is used as the route's ID and is required because every route must be uniquely identifiable, especially when using TypeScript so as to avoid type errors and accomplish autocomplete effectively.
+
+Let's take a look at an example route called `_pathlessLayout.tsx`:
+
+```
+
+routes/
+├── _pathlessLayout.tsx
+├── _pathlessLayout.a.tsx
+├── _pathlessLayout.b.tsx
+
+```
+
+In the tree above, `_pathlessLayout.tsx` is a pathless layout route that wraps two child routes, `_pathlessLayout.a.tsx` and `_pathlessLayout.b.tsx`.
+
+The `_pathlessLayout.tsx` route is used to wrap the child routes with a Pathless layout component:
+
+```tsx
+import { Outlet, createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  component: PathlessLayoutComponent,
+})
+
+function PathlessLayoutComponent() {
+  return (
+    <div>
+      <h1>Pathless layout</h1>
+      <Outlet />
+    </div>
+  )
+}
+```
+
+The following table shows which component will be rendered based on the URL:
+
+| URL Path | Component             |
+| -------- | --------------------- |
+| `/`      | `<Index>`             |
+| `/a`     | `<PathlessLayout><A>` |
+| `/b`     | `<PathlessLayout><B>` |
+
+Since TanStack Router supports mixed flat and directory routes, you can also express your application's routing using pathless layout routes within directories:
+
+```
+routes/
+├── _pathlessLayout/
+│   ├── route.tsx
+│   ├── a.tsx
+│   ├── b.tsx
+```
+
+However, unlike Layout Routes, since Pathless Layout Routes do match based on URL path segments, this means that these routes do not support [Dynamic Route Segments](#dynamic-route-segments) as part of their path and therefore cannot be matched in the URL.
+
+This means that you cannot do this:
+
+```
+routes/
+├── _$postId/ ❌
+│   ├── ...
+```
+
+Rather, you'd have to do this:
+
+```
+routes/
+├── $postId/
+├── _postPathlessLayout/ ✅
+│   ├── ...
+```
+
+## Non-Nested Routes
+
+Non-nested routes can be created by suffixing a parent file route segment with a `_` and are used to **un-nest** a route from its parents and render its own component tree.
+
+Consider the following flat route tree:
+
+```
+routes/
+├── posts.tsx
+├── posts.$postId.tsx
+├── posts_.$postId.edit.tsx
+```
+
+The following table shows which component will be rendered based on the URL:
+
+| URL Path          | Component                    |
+| ----------------- | ---------------------------- |
+| `/posts`          | `<Posts>`                    |
+| `/posts/123`      | `<Posts><Post postId="123">` |
+| `/posts/123/edit` | `<PostEditor postId="123">`  |
+
+- The `posts.$postId.tsx` route is nested as normal under the `posts.tsx` route and will render `<Posts><Post>`.
+- The `posts_.$postId.edit.tsx` route **does not share** the same `posts` prefix as the other routes and therefore will be treated as if it is a top-level route and will render `<PostEditor>`.
+
+## Excluding Files and Folders from Routes
+
+Files and folders can be excluded from route generation with a `-` prefix attached to the file name. This gives you the ability to colocate logic in the route directories.
+
+Consider the following route tree:
+
+```
+routes/
+├── posts.tsx
+├── -posts-table.tsx // 👈🏼 ignored
+├── -components/ // 👈🏼 ignored
+│   ├── header.tsx // 👈🏼 ignored
+│   ├── footer.tsx // 👈🏼 ignored
+│   ├── ...
+```
+
+We can import from the excluded files into our posts route
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { PostsTable } from './-posts-table'
+import { PostsHeader } from './-components/header'
+import { PostsFooter } from './-components/footer'
+
+export const Route = createFileRoute('/posts')({
+  loader: () => fetchPosts(),
+  component: PostComponent,
+})
+
+function PostComponent() {
+  const posts = Route.useLoaderData()
+
+  return (
+    <div>
+      <PostsHeader />
+      <PostsTable posts={posts} />
+      <PostsFooter />
+    </div>
+  )
+}
+```
+
+The excluded files will not be added to `routeTree.gen.ts`.
+
+## Pathless Route Group Directories
+
+Pathless route group directories use `()` as a way to group routes files together regardless of their path. They are purely organizational and do not affect the route tree or component tree in any way.
+
+```
+routes/
+├── index.tsx
+├── (app)/
+│   ├── dashboard.tsx
+│   ├── settings.tsx
+│   ├── users.tsx
+├── (auth)/
+│   ├── login.tsx
+│   ├── register.tsx
+```
+
+In the example above, the `app` and `auth` directories are purely organizational and do not affect the route tree or component tree in any way. They are used to group related routes together for easier navigation and organization.
+
+The following table shows which component will be rendered based on the URL:
+
+| URL Path     | Component     |
+| ------------ | ------------- |
+| `/`          | `<Index>`     |
+| `/dashboard` | `<Dashboard>` |
+| `/settings`  | `<Settings>`  |
+| `/users`     | `<Users>`     |
+| `/login`     | `<Login>`     |
+| `/register`  | `<Register>`  |
+
+As you can see, the `app` and `auth` directories are purely organizational and do not affect the route tree or component tree in any way.
+
+# Virtual File Routes
+
+> We'd like to thank the Remix team for [pioneering the concept of virtual file routes](https://www.youtube.com/watch?v=fjTX8hQTlEc&t=730s). We've taken inspiration from their work and adapted it to work with TanStack Router's existing file-based route-tree generation.
+
+Virtual file routes are a powerful concept that allows you to build a route tree programmatically using code that references real files in your project. This can be useful if:
+
+- You have an existing route organization that you want to keep.
+- You want to customize the location of your route files.
+- You want to completely override TanStack Router's file-based route generation and build your own convention.
+
+Here's a quick example of using virtual file routes to map a route tree to a set of real files in your project:
+
+```tsx
+// routes.ts
+import {
+  rootRoute,
+  route,
+  index,
+  layout,
+  physical,
+} from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  index('index.tsx'),
+  layout('pathlessLayout.tsx', [
+    route('/dashboard', 'app/dashboard.tsx', [
+      index('app/dashboard-index.tsx'),
+      route('/invoices', 'app/dashboard-invoices.tsx', [
+        index('app/invoices-index.tsx'),
+        route('$id', 'app/invoice-detail.tsx'),
+      ]),
+    ]),
+    physical('/posts', 'posts'),
+  ]),
+])
+```
+
+## Configuration
+
+Virtual file routes can be configured either via:
+
+- The `TanStackRouter` plugin for Vite/Rspack/Webpack
+- The `tsr.config.json` file for the TanStack Router CLI
+
+## Configuration via the TanStackRouter Plugin
+
+If you're using the `TanStackRouter` plugin for Vite/Rspack/Webpack, you can configure virtual file routes by passing the path of your routes file to the `virtualRoutesConfig` option when setting up the plugin:
+
+```tsx
+// vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
+
+export default defineConfig({
+  plugins: [
+    tanstackRouter({
+      target: 'react',
+      virtualRouteConfig: './routes.ts',
+    }),
+    react(),
+  ],
+})
+```
+
+Or, you choose to define the virtual routes directly in the configuration:
+
+```tsx
+// vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import { rootRoute } from '@tanstack/virtual-file-routes'
+
+const routes = rootRoute('root.tsx', [
+  // ... the rest of your virtual route tree
+])
+
+export default defineConfig({
+  plugins: [tanstackRouter({ virtualRouteConfig: routes }), react()],
+})
+```
+
+## Creating Virtual File Routes
+
+To create virtual file routes, you'll need to import the `@tanstack/virtual-file-routes` package. This package provides a set of functions that allow you to create virtual routes that reference real files in your project. A few utility functions are exported from the package:
+
+- `rootRoute` - Creates a virtual root route.
+- `route` - Creates a virtual route.
+- `index` - Creates a virtual index route.
+- `layout` - Creates a virtual pathless layout route.
+- `physical` - Creates a physical virtual route (more on this later).
+
+## Virtual Root Route
+
+The `rootRoute` function is used to create a virtual root route. It takes a file name and an array of children routes. Here's an example of a virtual root route:
+
+```tsx
+// routes.ts
+import { rootRoute } from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  // ... children routes
+])
+```
+
+## Virtual Route
+
+The `route` function is used to create a virtual route. It takes a path, a file name, and an array of children routes. Here's an example of a virtual route:
+
+```tsx
+// routes.ts
+import { route } from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  route('/about', 'about.tsx', [
+    // ... children routes
+  ]),
+])
+```
+
+You can also define a virtual route without a file name. This allows to set a common path prefix for its children:
+
+```tsx
+// routes.ts
+import { route } from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  route('/hello', [
+    route('/world', 'world.tsx'), // full path will be "/hello/world"
+    route('/universe', 'universe.tsx'), // full path will be "/hello/universe"
+  ]),
+])
+```
+
+## Virtual Index Route
+
+The `index` function is used to create a virtual index route. It takes a file name. Here's an example of a virtual index route:
+
+```tsx
+import { index } from '@tanstack/virtual-file-routes'
+
+const routes = rootRoute('root.tsx', [index('index.tsx')])
+```
+
+## Virtual Pathless Route
+
+The `layout` function is used to create a virtual pathless route. It takes a file name, an array of children routes, and an optional pathless ID. Here's an example of a virtual pathless route:
+
+```tsx
+// routes.ts
+import { layout } from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  layout('pathlessLayout.tsx', [
+    // ... children routes
+  ]),
+])
+```
+
+You can also specify a pathless ID to give the route a unique identifier that is different from the filename:
+
+```tsx
+// routes.ts
+import { layout } from '@tanstack/virtual-file-routes'
+
+export const routes = rootRoute('root.tsx', [
+  layout('my-pathless-layout-id', 'pathlessLayout.tsx', [
+    // ... children routes
+  ]),
+])
+```
+
+## Physical Virtual Routes
+
+Physical virtual routes are a way to "mount" a directory of good ol' TanStack Router File Based routing convention under a specific URL path. This can be useful if you are using virtual routes to customize a small portion of your route tree high up in the hierarchy, but want to use the standard file-based routing convention for sub-routes and directories.
+
+Consider the following file structure:
+
+```
+/routes
+├── root.tsx
+├── index.tsx
+├── pathless.tsx
+├── app
+│   ├── dashboard.tsx
+│   ├── dashboard-index.tsx
+│   ├── dashboard-invoices.tsx
+│   ├── invoices-index.tsx
+│   ├── invoice-detail.tsx
+└── posts
+    ├── index.tsx
+    ├── $postId.tsx
+    ├── $postId.edit.tsx
+    ├── comments/
+    │   ├── index.tsx
+    │   ├── $commentId.tsx
+    └── likes/
+        ├── index.tsx
+        ├── $likeId.tsx
+```
+
+Let's use virtual routes to customize our route tree for everything but `posts`, then use physical virtual routes to mount the `posts` directory under the `/posts` path:
+
+```tsx
+// routes.ts
+export const routes = rootRoute('root.tsx', [
+  // Set up your virtual routes as normal
+  index('index.tsx'),
+  layout('pathlessLayout.tsx', [
+    route('/dashboard', 'app/dashboard.tsx', [
+      index('app/dashboard-index.tsx'),
+      route('/invoices', 'app/dashboard-invoices.tsx', [
+        index('app/invoices-index.tsx'),
+        route('$id', 'app/invoice-detail.tsx'),
+      ]),
+    ]),
+    // Mount the `posts` directory under the `/posts` path
+    physical('/posts', 'posts'),
+  ]),
+])
+```
+
+## Virtual Routes inside of TanStack Router File Based routing
+
+The previous section showed you how you can use TanStack Router's File Based routing convention inside of a virtual route configuration.
+However, the opposite is possible as well.  
+You can configure the main part of your app's route tree using TanStack Router's File Based routing convention and opt into virtual route configuration for specific subtrees.
+
+Consider the following file structure:
+
+```
+/routes
+├── __root.tsx
+├── foo
+│   ├── bar
+│   │   ├── __virtual.ts
+│   │   ├── details.tsx
+│   │   ├── home.tsx
+│   │   └── route.ts
+│   └── bar.tsx
+└── index.tsx
+```
+
+Let's look at the `bar` directory which contains a special file named `__virtual.ts`. This file instructs the generator to switch over to virtual file route configuration for this directory (and its child directories).
+
+`__virtual.ts` configures the virtual routes for that particular subtree of the route tree. It uses the same API as explained above, with the only difference being that no `rootRoute` is defined for that subtree:
+
+```tsx
+// routes/foo/bar/__virtual.ts
+import {
+  defineVirtualSubtreeConfig,
+  index,
+  route,
+} from '@tanstack/virtual-file-routes'
+
+export default defineVirtualSubtreeConfig([
+  index('home.tsx'),
+  route('$id', 'details.tsx'),
+])
+```
+
+The helper function `defineVirtualSubtreeConfig` is closely modeled after vite's `defineConfig` and allows you to define a subtree configuration via a default export. The default export can either be
+
+- a subtree config object
+- a function returning a subtree config object
+- an async function returning a subtree config object
+
+## Inception
+
+You can mix and match TanStack Router's File Based routing convention and virtual route configuration however you like.  
+Let's go deeper!  
+Check out the following example that starts off using File Based routing convention, switches over to virtual route configuration for `/posts`, switches back to File Based routing convention for `/posts/lets-go` only to switch over to virtual route configuration again for `/posts/lets-go/deeper`.
+
+```
+├── __root.tsx
+├── index.tsx
+├── posts
+│   ├── __virtual.ts
+│   ├── details.tsx
+│   ├── home.tsx
+│   └── lets-go
+│       ├── deeper
+│       │   ├── __virtual.ts
+│       │   └── home.tsx
+│       └── index.tsx
+└── posts.tsx
+```
+
+## Configuration via the TanStack Router CLI
+
+If you're using the TanStack Router CLI, you can configure virtual file routes by defining the path to your routes file in the `tsr.config.json` file:
+
+```json
+// tsr.config.json
+{
+  "virtualRouteConfig": "./routes.ts"
+}
+```
+
+Or you can define the virtual routes directly in the configuration, while much less common allows you to configure them via the TanStack Router CLI by adding a `virtualRouteConfig` object to your `tsr.config.json` file and defining your virtual routes and passing the resulting JSON that is generated by calling the actual `rootRoute`/`route`/`index`/etc functions from the `@tanstack/virtual-file-routes` package:
+
+```json
+// tsr.config.json
+{
+  "virtualRouteConfig": {
+    "type": "root",
+    "file": "root.tsx",
+    "children": [
+      {
+        "type": "index",
+        "file": "home.tsx"
+      },
+      {
+        "type": "route",
+        "file": "posts/posts.tsx",
+        "path": "/posts",
+        "children": [
+          {
+            "type": "index",
+            "file": "posts/posts-home.tsx"
+          },
+          {
+            "type": "route",
+            "file": "posts/posts-detail.tsx",
+            "path": "$postId"
+          }
+        ]
+      },
+      {
+        "type": "layout",
+        "id": "first",
+        "file": "layout/first-pathless-layout.tsx",
+        "children": [
+          {
+            "type": "layout",
+            "id": "second",
+            "file": "layout/second-pathless-layout.tsx",
+            "children": [
+              {
+                "type": "route",
+                "file": "a.tsx",
+                "path": "/route-a"
+              },
+              {
+                "type": "route",
+                "file": "b.tsx",
+                "path": "/route-b"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+

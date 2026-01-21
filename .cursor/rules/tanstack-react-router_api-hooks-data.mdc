@@ -1,0 +1,583 @@
+---
+description: TanStack Router: API Hooks - Data (useAwaited, useBlocker, useLoaderData, useMatch)
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# useAwaited hook
+
+The `useAwaited` method is a hook that suspends until the provided promise is resolved or rejected.
+
+## useAwaited options
+
+The `useAwaited` hook accepts a single argument, an `options` object.
+
+### `options.promise` option
+
+- Type: `Promise<T>`
+- Required
+- The deferred promise to await.
+
+## useAwaited returns
+
+- Throws an error if the promise is rejected.
+- Suspends (throws a promise) if the promise is pending.
+- Returns the resolved value of a deferred promise if the promise is resolved.
+
+## Examples
+
+```tsx
+import { useAwaited } from '@tanstack/react-router'
+
+function Component() {
+  const { deferredPromise } = route.useLoaderData()
+
+  const data = useAwaited({ promise: myDeferredPromise })
+  // ...
+}
+```
+
+# useBlocker hook
+
+The `useBlocker` method is a hook that [blocks navigation](../../../guide/navigation-blocking.md) when a condition is met.
+
+> ⚠️ The following new `useBlocker` API is currently _experimental_.
+
+## useBlocker options
+
+The `useBlocker` hook accepts a single _required_ argument, an option object:
+
+### `options.shouldBlockFn` option
+
+- Required
+- Type: `ShouldBlockFn`
+- This function should return a `boolean` or a `Promise<boolean>` that tells the blocker if it should block the current navigation
+- The function has the argument of type `ShouldBlockFnArgs` passed to it, which tells you information about the current and next route and the action performed
+- Think of this function as telling the router if it should block the navigation, so returning `true` mean that it should block the navigation and `false` meaning that it should be allowed
+
+```ts
+interface ShouldBlockFnLocation<...> {
+  routeId: TRouteId
+  fullPath: TFullPath
+  pathname: string
+  params: TAllParams
+  search: TFullSearchSchema
+}
+
+type ShouldBlockFnArgs = {
+  current: ShouldBlockFnLocation
+  next: ShouldBlockFnLocation
+  action: HistoryAction
+}
+```
+
+### `options.disabled` option
+
+- Optional - defaults to `false`
+- Type: `boolean`
+- Specifies if the blocker should be entirely disabled or not
+
+### `options.enableBeforeUnload` option
+
+- Optional - defaults to `true`
+- Type: `boolean | (() => boolean)`
+- Tell the blocker to sometimes or always block the browser `beforeUnload` event or not
+
+### `options.withResolver` option
+
+- Optional - defaults to `false`
+- Type: `boolean`
+- Specify if the resolver returned by the hook should be used or whether your `shouldBlockFn` function itself resolves the blocking
+
+### `options.blockerFn` option (⚠️ deprecated)
+
+- Optional
+- Type: `BlockerFn`
+- The function that returns a `boolean` or `Promise<boolean>` indicating whether to allow navigation.
+
+### `options.condition` option (⚠️ deprecated)
+
+- Optional - defaults to `true`
+- Type: `boolean`
+- A navigation attempt is blocked when this condition is `true`.
+
+## useBlocker returns
+
+An object with the controls to allow manual blocking and unblocking of navigation.
+
+- `status` - A string literal that can be either `'blocked'` or `'idle'`
+- `next` - When status is `blocked`, a type narrrowable object that contains information about the next location
+- `current` - When status is `blocked`, a type narrrowable object that contains information about the current location
+- `action` - When status is `blocked`, a `HistoryAction` string that shows the action that triggered the navigation
+- `proceed` - When status is `blocked`, a function that allows navigation to continue
+- `reset` - When status is `blocked`, a function that cancels navigation (`status` will be reset to `'idle'`)
+
+or
+
+`void` when `withResolver` is `false`
+
+## Examples
+
+Two common use cases for the `useBlocker` hook are:
+
+### Basic usage
+
+```tsx
+import { useBlocker } from '@tanstack/react-router'
+
+function MyComponent() {
+  const [formIsDirty, setFormIsDirty] = useState(false)
+
+  useBlocker({
+    shouldBlockFn: () => formIsDirty,
+  })
+
+  // ...
+}
+```
+
+### Custom UI
+
+```tsx
+import { useBlocker } from '@tanstack/react-router'
+
+function MyComponent() {
+  const [formIsDirty, setFormIsDirty] = useState(false)
+
+  const { proceed, reset, status, next } = useBlocker({
+    shouldBlockFn: () => formIsDirty,
+    withResolver: true,
+  })
+
+  // ...
+
+  return (
+    <>
+      {/* ... */}
+      {status === 'blocked' && (
+        <div>
+          <p>You are navigating to {next.pathname}</p>
+          <p>Are you sure you want to leave?</p>
+          <button onClick={proceed}>Yes</button>
+          <button onClick={reset}>No</button>
+        </div>
+      )}
+    </>
+}
+```
+
+### Conditional blocking
+
+```tsx
+import { useBlocker } from '@tanstack/react-router'
+
+function MyComponent() {
+  const { proceed, reset, status } = useBlocker({
+    shouldBlockFn: ({ next }) => {
+      return !next.pathname.includes('step/')
+    },
+    withResolver: true,
+  })
+
+  // ...
+
+  return (
+    <>
+      {/* ... */}
+      {status === 'blocked' && (
+        <div>
+          <p>Are you sure you want to leave?</p>
+          <button onClick={proceed}>Yes</button>
+          <button onClick={reset}>No</button>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+### Without resolver
+
+```tsx
+import { useBlocker } from '@tanstack/react-router'
+
+function MyComponent() {
+  const [formIsDirty, setFormIsDirty] = useState(false)
+
+  useBlocker({
+    shouldBlockFn: ({ next }) => {
+      if (next.pathname.includes('step/')) {
+        return false
+      }
+
+      const shouldLeave = confirm('Are you sure you want to leave?')
+      return !shouldLeave
+    },
+  })
+
+  // ...
+}
+```
+
+### Type narrowing
+
+```tsx
+import { useBlocker } from '@tanstack/react-router'
+
+function MyComponent() {
+  const [formIsDirty, setFormIsDirty] = useState(false)
+
+  // block going from editor-1 to /foo/123?hello=world
+  const { proceed, reset, status } = useBlocker({
+    shouldBlockFn: ({ current, next }) => {
+      if (
+        current.routeId === '/editor-1' &&
+        next.fullPath === '/foo/$id' &&
+        next.params.id === '123' &&
+        next.search.hello === 'world'
+      ) {
+        return true
+      }
+      return false
+    },
+    enableBeforeUnload: false,
+    withResolver: true,
+  })
+
+  // ...
+}
+```
+
+# useCanGoBack hook
+
+The `useCanGoBack` hook returns a boolean representing if the router history can safely go back without exiting the application.
+
+> ⚠️ The following new `useCanGoBack` API is currently _experimental_.
+
+## useCanGoBack returns
+
+- If the router history is not at index `0`, `true`.
+- If the router history is at index `0`, `false`.
+
+## Limitations
+
+The router history index is reset after a navigation with [`reloadDocument`](../NavigateOptionsType.md#reloaddocument) set as `true`. This causes the router history to consider the new location as the initial one and will cause `useCanGoBack` to return `false`.
+
+## Examples
+
+### Showing a back button
+
+```tsx
+import { useRouter, useCanGoBack } from '@tanstack/react-router'
+
+function Component() {
+  const router = useRouter()
+  const canGoBack = useCanGoBack()
+
+  return (
+    <div>
+      {canGoBack ? (
+        <button onClick={() => router.history.back()}>Go back</button>
+      ) : null}
+
+      {/* ... */}
+    </div>
+  )
+}
+```
+
+# useChildMatches hook
+
+The `useChildMatches` hook returns all of the child [`RouteMatch`](../RouteMatchType.md) objects from the closest match down to the leaf-most match. **It does not include the current match, which can be obtained using the `useMatch` hook.**
+
+> [!IMPORTANT]
+> If the router has pending matches and they are showing their pending component fallbacks, `router.state.pendingMatches` will used instead of `router.state.matches`.
+
+## useChildMatches options
+
+The `useChildMatches` hook accepts a single _optional_ argument, an `options` object.
+
+### `opts.select` option
+
+- Optional
+- `(matches: RouteMatch[]) => TSelected`
+- If supplied, this function will be called with the route matches and the return value will be returned from `useChildMatches`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useChildMatches returns
+
+- If a `select` function is provided, the return value of the `select` function.
+- If no `select` function is provided, an array of [`RouteMatch`](../RouteMatchType.md) objects.
+
+## Examples
+
+```tsx
+import { useChildMatches } from '@tanstack/react-router'
+
+function Component() {
+  const childMatches = useChildMatches()
+  // ...
+}
+```
+
+# useLinkProps hook
+
+The `useLinkProps` hook that takes an object as its argument and returns a `React.AnchorHTMLAttributes<HTMLAnchorElement>` props object. These props can then be safely applied to an anchor element to create a link that can be used to navigate to the new location. This includes changes to the pathname, search params, hash, and location state.
+
+## useLinkProps options
+
+```tsx
+type UseLinkPropsOptions = ActiveLinkOptions &
+  React.AnchorHTMLAttributes<HTMLAnchorElement>
+```
+
+- [`ActiveLinkOptions`](../ActiveLinkOptionsType.md)
+- The `useLinkProps` options are used to build a [`LinkProps`](../LinkPropsType.md) object.
+- It also extends the `React.AnchorHTMLAttributes<HTMLAnchorElement>` type, so that any additional props that are passed to the `useLinkProps` hook will be merged with the [`LinkProps`](../LinkPropsType.md) object.
+
+## useLinkProps returns
+
+- A `React.AnchorHTMLAttributes<HTMLAnchorElement>` object that can be applied to an anchor element to create a link that can be used to navigate to the new location
+
+# useLoaderData hook
+
+The `useLoaderData` hook returns the loader data from the closest [`RouteMatch`](../RouteMatchType.md) in the component tree.
+
+## useLoaderData options
+
+The `useLoaderData` hook accepts an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- The route id of the closest parent match
+- Optional, but recommended for full type safety.
+- If `opts.strict` is `true`, TypeScript will warn for this option if it is not provided.
+- If `opts.strict` is `false`, TypeScript will provided loosened types for the returned loader data.
+
+### `opts.strict` option
+
+- Type: `boolean`
+- Optional - `default: true`
+- If `false`, the `opts.from` option will be ignored and types will be loosened to to reflect the shared types of all possible loader data.
+
+### `opts.select` option
+
+- Optional
+- `(loaderData: TLoaderData) => TSelected`
+- If supplied, this function will be called with the loader data and the return value will be returned from `useLoaderData`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useLoaderData returns
+
+- If a `select` function is provided, the return value of the `select` function.
+- If no `select` function is provided, the loader data or a loosened version of the loader data if `opts.strict` is `false`.
+
+## Examples
+
+```tsx
+import { useLoaderData } from '@tanstack/react-router'
+
+function Component() {
+  const loaderData = useLoaderData({ from: '/posts/$postId' })
+  //     ^? { postId: string, body: string, ... }
+  // ...
+}
+```
+
+# useLoaderDeps hook
+
+The `useLoaderDeps` hook is a hook that returns an object with the dependencies that are used to trigger the `loader` for a given route.
+
+## useLoaderDepsHook options
+
+The `useLoaderDepsHook` hook accepts an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- Required
+- The RouteID or path to get the loader dependencies from.
+
+### `opts.select` option
+
+- Type: `(deps: TLoaderDeps) => TSelected`
+- Optional
+- If supplied, this function will be called with the loader dependencies object and the return value will be returned from `useLoaderDeps`.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useLoaderDeps returns
+
+- An object of the loader dependencies or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useLoaderDeps } from '@tanstack/react-router'
+
+const routeApi = getRouteApi('/posts/$postId')
+
+function Component() {
+  const deps = useLoaderDeps({ from: '/posts/$postId' })
+
+  // OR
+
+  const routeDeps = routeApi.useLoaderDeps()
+
+  // OR
+
+  const postId = useLoaderDeps({
+    from: '/posts',
+    select: (deps) => deps.view,
+  })
+
+  // ...
+}
+```
+
+# useLocation hook
+
+The `useLocation` method is a hook that returns the current [`location`](../ParsedLocationType.md) object. This hook is useful for when you want to perform some side effect whenever the current location changes.
+
+## useLocation options
+
+The `useLocation` hook accepts an optional `options` object.
+
+### `opts.select` option
+
+- Type: `(state: ParsedLocationType) => TSelected`
+- Optional
+- If supplied, this function will be called with the [`location`](../ParsedLocationType.md) object and the return value will be returned from `useLocation`.
+
+## useLocation returns
+
+- The current [`location`](../ParsedLocationType.md) object or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useLocation } from '@tanstack/react-router'
+
+function Component() {
+  const location = useLocation()
+  //    ^ ParsedLocation
+
+  // OR
+
+  const pathname = useLocation({
+    select: (location) => location.pathname,
+  })
+  //    ^ string
+
+  // ...
+}
+```
+
+# useMatch hook
+
+The `useMatch` hook returns a [`RouteMatch`](../RouteMatchType.md) in the component tree. The raw route match contains all of the information about a route match in the router and also powers many other hooks under the hood like `useParams`, `useLoaderData`, `useRouteContext`, and `useSearch`.
+
+## useMatch options
+
+The `useMatch` hook accepts a single argument, an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- The route id of a match
+- Optional, but recommended for full type safety.
+- If `opts.strict` is `true`, `from` is required and TypeScript will warn for this option if it is not provided.
+- If `opts.strict` is `false`, `from` must not be set and TypeScript will provided loosened types for the returned [`RouteMatch`](../RouteMatchType.md).
+
+### `opts.strict` option
+
+- Type: `boolean`
+- Optional
+- `default: true`
+- If `false`, the `opts.from` must not be set and types will be loosened to `Partial<RouteMatch>` to reflect the shared types of all matches.
+
+### `opts.select` option
+
+- Optional
+- `(match: RouteMatch) => TSelected`
+- If supplied, this function will be called with the route match and the return value will be returned from `useMatch`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+### `opts.shouldThrow` option
+
+- Type: `boolean`
+- Optional
+- `default: true`
+- If `false`,`useMatch` will not throw an invariant exception in case a match was not found in the currently rendered matches; in this case, it will return `undefined`.
+
+## useMatch returns
+
+- If a `select` function is provided, the return value of the `select` function.
+- If no `select` function is provided, the [`RouteMatch`](../RouteMatchType.md) object or a loosened version of the `RouteMatch` object if `opts.strict` is `false`.
+
+## Examples
+
+### Accessing a route match
+
+```tsx
+import { useMatch } from '@tanstack/react-router'
+
+function Component() {
+  const match = useMatch({ from: '/posts/$postId' })
+  //     ^? strict match for RouteMatch
+  // ...
+}
+```
+
+### Accessing the root route's match
+
+```tsx
+import {
+  useMatch,
+  rootRouteId, // <<<< use this token!
+} from '@tanstack/react-router'
+
+function Component() {
+  const match = useMatch({ from: rootRouteId })
+  //     ^? strict match for RouteMatch
+  // ...
+}
+```
+
+### Checking if a specific route is currently rendered
+
+```tsx
+import { useMatch } from '@tanstack/react-router'
+
+function Component() {
+  const match = useMatch({ from: '/posts', shouldThrow: false })
+  //     ^? RouteMatch | undefined
+  if (match !== undefined) {
+    // ...
+  }
+}
+```
+

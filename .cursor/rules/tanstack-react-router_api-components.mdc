@@ -1,0 +1,968 @@
+---
+description: TanStack Router: API Components and Create Functions
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Await component
+
+The `Await` component is a component that suspends until the provided promise is resolved or rejected.
+This is only necessary for React 18.
+If you are using React 19, you can use the `use()` hook instead.
+
+## Await props
+
+The `Await` component accepts the following props:
+
+### `props.promise` prop
+
+- Type: `Promise<T>`
+- Required
+- The promise to await.
+
+### `props.children` prop
+
+- Type: `(result: T) => React.ReactNode`
+- Required
+- A function that will be called with the resolved value of the promise.
+
+## Await returns
+
+- Throws an error if the promise is rejected.
+- Suspends (throws a promise) if the promise is pending.
+- Returns the resolved value of a deferred promise if the promise is resolved using `props.children` as the render function.
+
+## Examples
+
+```tsx
+import { Await } from '@tanstack/react-router'
+
+function Component() {
+  const { deferredPromise } = route.useLoaderData()
+
+  return (
+    <Await promise={deferredPromise}>
+      {(data) => <div>{JSON.stringify(data)}</div>}
+    </Await>
+  )
+}
+```
+
+# CatchBoundary component
+
+The `CatchBoundary` component is a component that catches errors thrown by its children, renders an error component and optionally calls the `onCatch` callback. It also accepts a `getResetKey` function that can be used to declaratively reset the component's state when the key changes.
+
+## CatchBoundary props
+
+The `CatchBoundary` component accepts the following props:
+
+### `props.getResetKey` prop
+
+- Type: `() => string`
+- Required
+- A function that returns a string that will be used to reset the component's state when the key changes.
+
+### `props.children` prop
+
+- Type: `React.ReactNode`
+- Required
+- The component's children to render when there is no error
+
+### `props.errorComponent` prop
+
+- Type: `React.ReactNode`
+- Optional - [`default: ErrorComponent`](../errorComponentComponent.md)
+- The component to render when there is an error.
+
+### `props.onCatch` prop
+
+- Type: `(error: any) => void`
+- Optional
+- A callback that will be called with the error that was thrown by the component's children.
+
+## CatchBoundary returns
+
+- Returns the component's children if there is no error.
+- Returns the `errorComponent` if there is an error.
+
+## Examples
+
+```tsx
+import { CatchBoundary } from '@tanstack/react-router'
+
+function Component() {
+  return (
+    <CatchBoundary
+      getResetKey={() => 'reset'}
+      onCatch={(error) => console.error(error)}
+    >
+      <div>My Component</div>
+    </CatchBoundary>
+  )
+}
+```
+
+# CatchNotFound Component
+
+The `CatchNotFound` component is a component that catches not-found errors thrown by its children, renders a fallback component and optionally calls the `onCatch` callback. It resets when the pathname changes.
+
+## CatchNotFound props
+
+The `CatchNotFound` component accepts the following props:
+
+### `props.children` prop
+
+- Type: `React.ReactNode`
+- Required
+- The component's children to render when there is no error
+
+### `props.fallback` prop
+
+- Type: `(error: NotFoundError) => React.ReactElement`
+- Optional
+- The component to render when there is an error
+
+### `props.onCatch` prop
+
+- Type: `(error: any) => void`
+- Optional
+- A callback that will be called with the error that was thrown by the component's children
+
+## CatchNotFound returns
+
+- Returns the component's children if there is no error.
+- Returns the `fallback` if there is an error.
+
+## Examples
+
+```tsx
+import { CatchNotFound } from '@tanstack/react-router'
+
+function Component() {
+  return (
+    <CatchNotFound
+      fallback={(error) => <p>Not found error! {JSON.stringify(error)}</p>}
+    >
+      <ComponentThatMightThrowANotFoundError />
+    </CatchNotFound>
+  )
+}
+```
+
+# ClientOnly Component
+
+The `ClientOnly` component is used to render a components only in the client, without breaking the server-side rendering due to hydration errors. It accepts a `fallback` prop that will be rendered if the JS is not yet loaded in the client.
+
+## Props
+
+The `ClientOnly` component accepts the following props:
+
+### `props.fallback` prop
+
+The fallback component to render if the JS is not yet loaded in the client.
+
+### `props.children` prop
+
+The component to render if the JS is loaded in the client.
+
+## Returns
+
+- Returns the component's children if the JS is loaded in the client.
+- Returns the `fallback` component if the JS is not yet loaded in the client.
+
+## Examples
+
+```tsx
+// src/routes/dashboard.tsx
+import { ClientOnly, createFileRoute } from '@tanstack/react-router'
+import {
+  Charts,
+  FallbackCharts,
+} from './charts-that-break-server-side-rendering'
+
+export const Route = createFileRoute('/dashboard')({
+  component: Dashboard,
+  // ... other route options
+})
+
+function Dashboard() {
+  return (
+    <div>
+      <p>Dashboard</p>
+      <ClientOnly fallback={<FallbackCharts />}>
+        <Charts />
+      </ClientOnly>
+    </div>
+  )
+}
+```
+
+# createFileRoute function
+
+The `createFileRoute` function is a factory that can be used to create a file-based route instance. This route instance can then be used to automatically generate a route tree with the `tsr generate` and `tsr watch` commands.
+
+## createFileRoute options
+
+The `createFileRoute` function accepts a single argument of type `string` that represents the `path` of the file that the route will be generated from.
+
+### `path` option
+
+- Type: `string` literal
+- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**
+- The full path of the file that the route will be generated from
+
+## createFileRoute returns
+
+A new function that accepts a single argument of type [`RouteOptions`](../RouteOptionsType.md) that will be used to configure the file [`Route`](../RouteType.md) instance.
+
+> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
+
+## Examples
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute({
+  loader: () => {
+    return 'Hello World'
+  },
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# createLazyFileRoute function
+
+The `createLazyFileRoute` function is used for creating a partial file-based route route instance that is lazily loaded when matched. This route instance can only be used to configure the [non-critical properties](../../../guide/code-splitting.md#how-does-tanstack-router-split-code) of the route, such as `component`, `pendingComponent`, `errorComponent`, and the `notFoundComponent`.
+
+## createLazyFileRoute options
+
+The `createLazyFileRoute` function accepts a single argument of type `string` that represents the `path` of the file that the route will be generated from.
+
+### `path`
+
+- Type: `string`
+- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**
+- The full path of the file that the route will be generated from.
+
+### createLazyFileRoute returns
+
+A new function that accepts a single argument of partial of the type [`RouteOptions`](../RouteOptionsType.md) that will be used to configure the file [`Route`](../RouteType.md) instance.
+
+- Type:
+
+```tsx
+Pick<
+  RouteOptions,
+  'component' | 'pendingComponent' | 'errorComponent' | 'notFoundComponent'
+>
+```
+
+- [`RouteOptions`](../RouteOptionsType.md)
+
+> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
+
+### Examples
+
+```tsx
+import { createLazyFileRoute } from '@tanstack/react-router'
+
+export const Route = createLazyFileRoute('/')({
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# createLazyRoute function
+
+The `createLazyRoute` function is used for creating a partial code-based route route instance that is lazily loaded when matched. This route instance can only be used to configure the [non-critical properties](../../../guide/code-splitting.md#how-does-tanstack-router-split-code) of the route, such as `component`, `pendingComponent`, `errorComponent`, and the `notFoundComponent`.
+
+## createLazyRoute options
+
+The `createLazyRoute` function accepts a single argument of type `string` that represents the `id` of the route.
+
+### `id`
+
+- Type: `string`
+- Required
+- The route id of the route.
+
+### createLazyRoute returns
+
+A new function that accepts a single argument of partial of the type [`RouteOptions`](../RouteOptionsType.md) that will be used to configure the file [`Route`](../RouteType.md) instance.
+
+- Type:
+
+```tsx
+Pick<
+  RouteOptions,
+  'component' | 'pendingComponent' | 'errorComponent' | 'notFoundComponent'
+>
+```
+
+- [`RouteOptions`](../RouteOptionsType.md)
+
+> ⚠️ Note: This route instance must be manually lazily loaded against its critical route instance using the `lazy` method returned by the `createRoute` function.
+
+### Examples
+
+```tsx
+// src/route-pages/index.tsx
+import { createLazyRoute } from '@tanstack/react-router'
+
+export const Route = createLazyRoute('/')({
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+
+// src/routeTree.tsx
+import {
+  createRootRouteWithContext,
+  createRoute,
+  Outlet,
+} from '@tanstack/react-router'
+
+interface MyRouterContext {
+  foo: string
+}
+
+const rootRoute = createRootRouteWithContext<MyRouterContext>()({
+  component: () => <Outlet />,
+})
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+}).lazy(() => import('./route-pages/index').then((d) => d.Route))
+
+export const routeTree = rootRoute.addChildren([indexRoute])
+```
+
+# createRootRoute function
+
+The `createRootRoute` function returns a new root route instance. A root route instance can then be used to create a route-tree.
+
+## createRootRoute options
+
+The options that will be used to configure the root route instance.
+
+- Type:
+
+```tsx
+Omit<
+  RouteOptions,
+  | 'path'
+  | 'id'
+  | 'getParentRoute'
+  | 'caseSensitive'
+  | 'parseParams'
+  | 'stringifyParams'
+>
+```
+
+- [`RouteOptions`](../RouteOptionsType.md)
+- Optional
+
+## createRootRoute returns
+
+A new [`Route`](../RouteType.md) instance.
+
+## Examples
+
+```tsx
+import { createRootRoute, createRouter, Outlet } from '@tanstack/react-router'
+
+const rootRoute = createRootRoute({
+  component: () => <Outlet />,
+  // ... root route options
+})
+
+const routeTree = rootRoute.addChildren([
+  // ... other routes
+])
+
+const router = createRouter({
+  routeTree,
+})
+```
+
+# createRootRouteWithContext function
+
+The `createRootRouteWithContext` function is a helper function that can be used to create a root route instance that requires a context type to be fulfilled when the router is created.
+
+## createRootRouteWithContext generics
+
+The `createRootRouteWithContext` function accepts a single generic argument:
+
+### `TRouterContext` generic
+
+- Type: `TRouterContext`
+- Optional, **but recommended**.
+- The context type that will be required to be fulfilled when the router is created
+
+## createRootRouteWithContext returns
+
+- A factory function that can be used to create a new [`createRootRoute`](../createRootRouteFunction.md) instance.
+- It accepts a single argument, the same as the [`createRootRoute`](../createRootRouteFunction.md) function.
+
+## Examples
+
+```tsx
+import {
+  createRootRouteWithContext,
+  createRouter,
+} from '@tanstack/react-router'
+import { QueryClient } from '@tanstack/react-query'
+
+interface MyRouterContext {
+  queryClient: QueryClient
+}
+
+const rootRoute = createRootRouteWithContext<MyRouterContext>()({
+  component: () => <Outlet />,
+  // ... root route options
+})
+
+const routeTree = rootRoute.addChildren([
+  // ... other routes
+])
+
+const queryClient = new QueryClient()
+
+const router = createRouter({
+  routeTree,
+  context: {
+    queryClient,
+  },
+})
+```
+
+# createRoute function
+
+The `createRoute` function implements returns a [`Route`](../RouteType.md) instance. A route instance can then be passed to a root route's children to create a route tree, which is then passed to the router.
+
+## createRoute options
+
+- Type: [`RouteOptions`](../RouteOptionsType.md)
+- Required
+- The options that will be used to configure the route instance
+
+## createRoute returns
+
+A new [`Route`](../RouteType.md) instance.
+
+## Examples
+
+```tsx
+import { createRoute } from '@tanstack/react-router'
+import { rootRoute } from './__root'
+
+const Route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  loader: () => {
+    return 'Hello World'
+  },
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# createRouteMask function
+
+The `createRouteMask` function is a helper function that can be used to create a route mask configuration that can be passed to the `RouterOptions.routeMasks` option.
+
+## createRouteMask options
+
+- Type: [`RouteMask`](../RouteMaskType.md)
+- Required
+- The options that will be used to configure the route mask
+
+## createRouteMask returns
+
+- A object with the type signature of [`RouteMask`](../RouteMaskType.md) that can be passed to the `RouterOptions.routeMasks` option.
+
+## Examples
+
+```tsx
+import { createRouteMask, createRouter } from '@tanstack/react-router'
+
+const photoModalToPhotoMask = createRouteMask({
+  routeTree,
+  from: '/photos/$photoId/modal',
+  to: '/photos/$photoId',
+  params: true,
+})
+
+// Set up a Router instance
+const router = createRouter({
+  routeTree,
+  routeMasks: [photoModalToPhotoMask],
+})
+```
+
+# createRouter function
+
+The `createRouter` function accepts a [`RouterOptions`](../RouterOptionsType.md) object and creates a new [`Router`](../RouterClass.md) instance.
+
+## createRouter options
+
+- Type: [`RouterOptions`](../RouterOptionsType.md)
+- Required
+- The options that will be used to configure the router instance.
+
+## createRouter returns
+
+- An instance of the [`Router`](../RouterType.md).
+
+## Examples
+
+```tsx
+import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { routeTree } from './routeTree.gen'
+
+const router = createRouter({
+  routeTree,
+  defaultPreload: 'intent',
+})
+
+export default function App() {
+  return <RouterProvider router={router} />
+}
+```
+
+# DefaultGlobalNotFound component
+
+The `DefaultGlobalNotFound` component is a component that renders "Not Found" on the root route when there is no other route that matches and a `notFoundComponent` is not provided.
+
+## DefaultGlobalNotFound returns
+
+```tsx
+<p>Not Found</p>
+```
+
+# defer function
+
+> [!CAUTION]
+> You don't need to call `defer` manually anymore, Promises are handled automatically now.
+
+The `defer` function wraps a promise with a deferred state object that can be used to inspect the promise's state. This deferred promise can then be passed to the [`useAwaited`](../useAwaitedHook.md) hook or the [`<Await>`](../awaitComponent.md) component for suspending until the promise is resolved or rejected.
+
+The `defer` function accepts a single argument, the `promise` to wrap with a deferred state object.
+
+## defer options
+
+- Type: `Promise<T>`
+- Required
+- The promise to wrap with a deferred state object.
+
+## defer returns
+
+- A promise that can be passed to the [`useAwaited`](../useAwaitedHook.md) hook or the [`<Await>`](../awaitComponent.md) component.
+
+## Examples
+
+```tsx
+import { defer } from '@tanstack/react-router'
+
+const route = createRoute({
+  loader: () => {
+    const deferredPromise = defer(fetch('/api/data'))
+    return { deferredPromise }
+  },
+  component: MyComponent,
+})
+
+function MyComponent() {
+  const { deferredPromise } = Route.useLoaderData()
+
+  const data = useAwaited({ promise: deferredPromise })
+
+  // or
+
+  return (
+    <Await promise={deferredPromise}>
+      {(data) => <div>{JSON.stringify(data)}</div>}
+    </Await>
+  )
+}
+```
+
+# ErrorComponent component
+
+The `ErrorComponent` component is a component that renders an error message and optionally the error's message.
+
+## ErrorComponent props
+
+The `ErrorComponent` component accepts the following props:
+
+### `props.error` prop
+
+- Type: `any`
+- The error that was thrown by the component's children
+
+### `props.reset` prop
+
+- Type: `() => void`
+- A function to programmatically reset the error state
+
+## ErrorComponent returns
+
+- Returns a formatted error message with the error's message if it exists.
+- The error message can be toggled by clicking the "Show Error" button.
+- By default, the error message will be shown in development.
+
+# getRouteApi function
+
+The `getRouteApi` function provides type-safe version of common hooks like `useParams`, `useSearch`, `useRouteContext`, `useNavigate`, `useLoaderData`, and `useLoaderDeps` that are pre-bound to a specific route ID and corresponding registered route types.
+
+## getRouteApi options
+
+The `getRouteApi` function accepts a single argument, a `routeId` string literal.
+
+### `routeId` option
+
+- Type: `string`
+- Required
+- The route ID to which the [`RouteApi`](../RouteApiClass.md) instance will be bound
+
+## getRouteApi returns
+
+- An instance of the [`RouteApi`](../RouteApiType.md) that is pre-bound to the route ID that the `getRouteApi` function was called with.
+
+## Examples
+
+```tsx
+import { getRouteApi } from '@tanstack/react-router'
+
+const routeApi = getRouteApi('/posts')
+
+export function PostsPage() {
+  const posts = routeApi.useLoaderData()
+  // ...
+}
+```
+
+# HistoryState interface
+
+The `HistoryState` interface is an interface exported by the `history` package that describes the shape of the state object that can be used in conjunction with the `history` package and the `window.location` API.
+
+You can extend this interface to add additional properties to the state object across your application.
+
+```tsx
+// src/main.tsx
+declare module '@tanstack/react-router' {
+  // ...
+
+  interface HistoryState {
+    additionalRequiredProperty: number
+    additionalProperty?: string
+  }
+}
+```
+
+# isNotFound function
+
+The `isNotFound` function can be used to determine if an object is a [`NotFoundError`](../NotFoundErrorType.md) object.
+
+## isNotFound options
+
+The `isNotFound` function accepts a single argument, an `input`.
+
+### `input` option
+
+- Type: `unknown`
+- Required
+- An object to check if it is a [`NotFoundError`](../NotFoundErrorType.md).
+
+## isNotFound returns
+
+- Type: `boolean`
+- `true` if the object is a [`NotFoundError`](../NotFoundErrorType.md).
+- `false` if the object is not a [`NotFoundError`](../NotFoundErrorType.md).
+
+## Examples
+
+```tsx
+import { isNotFound } from '@tanstack/react-router'
+
+function somewhere(obj: unknown) {
+  if (isNotFound(obj)) {
+    // ...
+  }
+}
+```
+
+# isRedirect function
+
+The `isRedirect` function can be used to determine if an object is a redirect object.
+
+## isRedirect options
+
+The `isRedirect` function accepts a single argument, an `input`.
+
+#### `input`
+
+- Type: `unknown`
+- Required
+- An object to check if it is a redirect object
+
+## isRedirect returns
+
+- Type: `boolean`
+- `true` if the object is a redirect object
+- `false` if the object is not a redirect object
+
+## Examples
+
+```tsx
+import { isRedirect } from '@tanstack/react-router'
+
+function somewhere(obj: unknown) {
+  if (isRedirect(obj)) {
+    // ...
+  }
+}
+```
+
+# lazyRouteComponent function
+
+> [!IMPORTANT]
+> If you are using file-based routing, it's recommended to use the `createLazyFileRoute` function instead.
+
+The `lazyRouteComponent` function can be used to create a one-off code-split route component that can be preloaded using a `component.preload()` method.
+
+## lazyRouteComponent options
+
+The `lazyRouteComponent` function accepts two arguments:
+
+### `importer` option
+
+- Type: `() => Promise<T>`
+- Required
+- A function that returns a promise that resolves to an object that contains the component to be loaded.
+
+### `exportName` option
+
+- Type: `string`
+- Optional
+- The name of the component to be loaded from the imported object. Defaults to `'default'`.
+
+## lazyRouteComponent returns
+
+- A `React.lazy` component that can be preloaded using a `component.preload()` method.
+
+## Examples
+
+```tsx
+import { lazyRouteComponent } from '@tanstack/react-router'
+
+const route = createRoute({
+  path: '/posts/$postId',
+  component: lazyRouteComponent(() => import('./Post')), // default export
+})
+
+// or
+
+const route = createRoute({
+  path: '/posts/$postId',
+  component: lazyRouteComponent(
+    () => import('./Post'),
+    'PostByIdPageComponent', // named export
+  ),
+})
+```
+
+# Link component
+
+The `Link` component is a component that can be used to create a link that can be used to navigate to a new location. This includes changes to the pathname, search params, hash, and location state.
+
+## Link props
+
+The `Link` component accepts the following props:
+
+### `...props`
+
+- Type: `LinkProps & React.RefAttributes<HTMLAnchorElement>`
+- [`LinkProps`](../LinkPropsType.md)
+
+## Link returns
+
+An anchor element that can be used to navigate to a new location.
+
+## Examples
+
+```tsx
+import { Link } from '@tanstack/react-router'
+
+function Component() {
+  return (
+    <Link
+      to="/somewhere/$somewhereId"
+      params={{ somewhereId: 'baz' }}
+      search={(prev) => ({ ...prev, foo: 'bar' })}
+    >
+      Click me
+    </Link>
+  )
+}
+```
+
+# Link options
+
+`linkOptions` is a function which type checks an object literal with the intention of being used for `Link`, `navigate` or `redirect`
+
+## linkOptions props
+
+The `linkOptions` accepts the following option:
+
+### `...props`
+
+- Type: `LinkProps & React.RefAttributes<HTMLAnchorElement>`
+- [`LinkProps`](../LinkPropsType.md)
+
+## `linkOptions` returns
+
+An object literal with the exact type inferred from the input
+
+## Examples
+
+```tsx
+const userLinkOptions = linkOptions({
+  to: '/dashboard/users/user',
+  search: {
+    usersView: {
+      sortBy: 'email',
+      filterBy: 'filter',
+    },
+    userId: 0,
+  },
+})
+
+function DashboardComponent() {
+  return <Link {...userLinkOptions} />
+}
+```
+
+# MatchRoute component
+
+A component version of the `useMatchRoute` hook. It accepts the same options as the `useMatchRoute` with additional props to aid in conditional rendering.
+
+## MatchRoute props
+
+The `MatchRoute` component accepts the same options as the `useMatchRoute` hook with additional props to aid in conditional rendering.
+
+### `...props` prop
+
+- Type: [`UseMatchRouteOptions`](../UseMatchRouteOptionsType.md)
+
+### `children` prop
+
+- Optional
+- `React.ReactNode`
+  - The component that will be rendered if the route is matched.
+- `((params: TParams | false) => React.ReactNode)`
+  - A function that will be called with the matched route's params or `false` if no route was matched. This can be useful for components that need to always render, but render different props based on a route match or not.
+
+## MatchRoute returns
+
+Either the `children` prop or the return value of the `children` function.
+
+## Examples
+
+```tsx
+import { MatchRoute } from '@tanstack/react-router'
+
+function Component() {
+  return (
+    <div>
+      <MatchRoute to="/posts/$postId" params={{ postId: '123' }} pending>
+        {(match) => <Spinner show={!!match} wait="delay-50" />}
+      </MatchRoute>
+    </div>
+  )
+}
+```
+
+# Navigate component
+
+The `Navigate` component is a component that can be used to navigate to a new location when rendered. This includes changes to the pathname, search params, hash, and location state. The underlying navigation will happen inside of a `useEffect` hook when successfully rendered.
+
+## Navigate props
+
+The `Navigate` component accepts the following props:
+
+### `...options`
+
+- Type: [`NavigateOptions`](../NavigateOptionsType.md)
+
+## Navigate returns
+
+- `null`
+
+# notFound function
+
+The `notFound` function returns a new `NotFoundError` object that can be either returned or thrown from places like a Route's `beforeLoad` or `loader` callbacks to trigger the `notFoundComponent`.
+
+## notFound options
+
+The `notFound` function accepts a single optional argument, the `options` to create the not-found error object.
+
+- Type: [`Partial<NotFoundError>`](../NotFoundErrorType.md)
+- Optional
+
+## notFound returns
+
+- If the `throw` property is `true` in the `options` object, the `NotFoundError` object will be thrown from within the function call.
+- If the `throw` property is `false | undefined` in the `options` object, the `NotFoundError` object will be returned.
+
+## Examples
+
+```tsx
+import { notFound, createFileRoute, rootRouteId } from '@tanstack/react-router'
+
+const Route = new createFileRoute('/posts/$postId')({
+  // throwing a not-found object
+  loader: ({ context: { post } }) => {
+    if (!post) {
+      throw notFound()
+    }
+  },
+  // or if you want to show a not-found on the whole page
+  loader: ({ context: { team } }) => {
+    if (!team) {
+      throw notFound({ routeId: rootRouteId })
+    }
+  },
+  // ... other route options
+})
+```
+
+# Outlet component
+
+The `Outlet` component is a component that can be used to render the next child route of a parent route.
+
+## Outlet props
+
+The `Outlet` component does not accept any props.
+
+## Outlet returns
+
+- If matched, the child route match's `component`/`errorComponent`/`pendingComponent`/`notFoundComponent`.
+- If not matched, `null`.
+

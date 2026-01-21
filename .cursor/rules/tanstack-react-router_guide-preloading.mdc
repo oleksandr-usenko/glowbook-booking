@@ -1,0 +1,383 @@
+---
+description: TanStack Router Guide: Preloading, Render Optimizations, Route Masking
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Preloading
+
+Preloading in TanStack Router is a way to load a route before the user actually navigates to it. This is useful for routes that are likely to be visited by the user next. For example, if you have a list of posts and the user is likely to click on one of them, you can preload the post route so that it's ready to go when the user clicks on it.
+
+## Supported Preloading Strategies
+
+- Intent
+  - Preloading by **"intent"** works by using hover and touch start events on `<Link>` components to preload the dependencies for the destination route.
+  - This strategy is useful for preloading routes that the user is likely to visit next.
+- Viewport Visibility
+  - Preloading by **"viewport**" works by using the Intersection Observer API to preload the dependencies for the destination route when the `<Link>` component is in the viewport.
+  - This strategy is useful for preloading routes that are below the fold or off-screen.
+- Render
+  - Preloading by **"render"** works by preloading the dependencies for the destination route as soon as the `<Link>` component is rendered in the DOM.
+  - This strategy is useful for preloading routes that are always needed.
+
+## How long does preloaded data stay in memory?
+
+Preloaded route matches are temporarily cached in memory with a few important caveats:
+
+- **Unused preloaded data is removed after 30 seconds by default.** This can be configured by setting the `defaultPreloadMaxAge` option on your router.
+- **Obviously, when a route is loaded, its preloaded version is promoted to the router's normal pending matches state.**
+
+If you need more control over preloading, caching and/or garbage collection of preloaded data, you should use an external caching library like [TanStack Query](https://tanstack.com/query).
+
+The simplest way to preload routes for your application is to set the `defaultPreload` option to `intent` for your entire router:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  // ...
+  defaultPreload: "intent",
+});
+```
+
+This will turn on `intent` preloading by default for all `<Link>` components in your application. You can also set the `preload` prop on individual `<Link>` components to override the default behavior.
+
+## Preload Delay
+
+By default, preloading will start after **50ms** of the user hovering or touching a `<Link>` component. You can change this delay by setting the `defaultPreloadDelay` option on your router:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  // ...
+  defaultPreloadDelay: 100,
+});
+```
+
+You can also set the `preloadDelay` prop on individual `<Link>` components to override the default behavior on a per-link basis.
+
+## Built-in Preloading & `preloadStaleTime`
+
+If you're using the built-in loaders, you can control how long preloaded data is considered fresh until another preload is triggered by setting either `routerOptions.defaultPreloadStaleTime` or `routeOptions.preloadStaleTime` to a number of milliseconds. **By default, preloaded data is considered fresh for 30 seconds.**.
+
+To change this, you can set the `defaultPreloadStaleTime` option on your router:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  // ...
+  defaultPreloadStaleTime: 10_000,
+});
+```
+
+Or, you can use the `routeOptions.preloadStaleTime` option on individual routes:
+
+```tsx
+// src/routes/posts.$postId.tsx
+export const Route = createFileRoute("/posts/$postId")({
+  loader: async ({ params }) => fetchPost(params.postId),
+  // Preload the route again if the preload cache is older than 10 seconds
+  preloadStaleTime: 10_000,
+});
+```
+
+## Preloading with External Libraries
+
+When integrating external caching libraries like React Query, which have their own mechanisms for determining stale data, you may want to override the default preloading and stale-while-revalidate logic of TanStack Router. These libraries often use options like staleTime to control the freshness of data.
+
+To customize the preloading behavior in TanStack Router and fully leverage your external library's caching strategy, you can bypass the built-in caching by setting routerOptions.defaultPreloadStaleTime or routeOptions.preloadStaleTime to 0. This ensures that all preloads are marked as stale internally, and loaders are always invoked, allowing your external library, such as React Query, to manage data loading and caching.
+
+For example:
+
+```tsx
+import { createRouter } from "@tanstack/react-router";
+
+const router = createRouter({
+  // ...
+  defaultPreloadStaleTime: 0,
+});
+```
+
+This would then allow you, for instance, to use an option like React Query's `staleTime` to control the freshness of your preloads.
+
+## Preloading Manually
+
+If you need to manually preload a route, you can use the router's `preloadRoute` method. It accepts a standard TanStack `NavigateOptions` object and returns a promise that resolves when the route is preloaded.
+
+```tsx
+function Component() {
+  const router = useRouter();
+
+  useEffect(() => {
+    async function preload() {
+      try {
+        const matches = await router.preloadRoute({
+          to: postRoute,
+          params: { id: 1 },
+        });
+      } catch (err) {
+        // Failed to preload route
+      }
+    }
+
+    preload();
+  }, [router]);
+
+  return <div />;
+}
+```
+
+If you need to preload only the JS chunk of a route, you can use the router's `loadRouteChunk` method. It accepts a route object and returns a promise that resolves when the route chunk is loaded.
+
+```tsx
+function Component() {
+  const router = useRouter();
+
+  useEffect(() => {
+    async function preloadRouteChunks() {
+      try {
+        const postsRoute = router.routesByPath["/posts"];
+        await Promise.all([
+          router.loadRouteChunk(router.routesByPath["/"]),
+          router.loadRouteChunk(postsRoute),
+          router.loadRouteChunk(postsRoute.parentRoute),
+        ]);
+      } catch (err) {
+        // Failed to preload route chunk
+      }
+    }
+
+    preloadRouteChunks();
+  }, [router]);
+
+  return <div />;
+}
+```
+
+# Render Optimizations
+
+TanStack Router includes several optimizations to ensure your components only re-render when necessary. These optimizations include:
+
+## structural sharing
+
+TanStack Router uses a technique called "structural sharing" to preserve as many references as possible between re-renders, which is particularly useful for state stored in the URL, such as search parameters.
+
+For example, consider a `details` route with two search parameters, `foo` and `bar`, accessed like this:
+
+```tsx
+const search = Route.useSearch();
+```
+
+When only `bar` is changed by navigating from `/details?foo=f1&bar=b1` to `/details?foo=f1&bar=b2`, `search.foo` will be referentially stable and only `search.bar` will be replaced.
+
+## fine-grained selectors
+
+You can access and subscribe to the router state using various hooks like `useRouterState`, `useSearch`, and others. If you only want a specific component to re-render when a particular subset of the router state such as a subset of the search parameters changes, you can use partial subscriptions with the `select` property.
+
+```tsx
+// component won't re-render when `bar` changes
+const foo = Route.useSearch({ select: ({ foo }) => foo });
+```
+
+### structural sharing with fine-grained selectors
+
+The `select` function can perform various calculations on the router state, allowing you to return different types of values, such as objects. For example:
+
+```tsx
+const result = Route.useSearch({
+  select: (search) => {
+    return {
+      foo: search.foo,
+      hello: `hello ${search.foo}`,
+    };
+  },
+});
+```
+
+Although this works, it will cause your component to re-render each time, since `select` is now returning a new object each time it’s called.
+
+You can avoid this re-rendering issue by using "structural sharing" as described above. By default, structural sharing is turned off to maintain backward compatibility, but this may change in v2.
+
+To enable structural sharing for fine grained selectors, you have two options:
+
+#### Enable it by default in the router options
+
+```tsx
+const router = createRouter({
+  routeTree,
+  defaultStructuralSharing: true,
+});
+```
+
+#### Enable it per hook usage as shown here
+
+```tsx
+const result = Route.useSearch({
+  select: (search) => {
+    return {
+      foo: search.foo,
+      hello: `hello ${search.foo}`,
+    };
+  },
+  structuralSharing: true,
+});
+```
+
+> [!IMPORTANT]
+> Structural sharing only works with JSON-compatible data. This means you cannot use `select` to return items like class instances if structural sharing is enabled.
+
+In line with TanStack Router's type-safe design, TypeScript will raise an error if you attempt the following:
+
+```tsx
+const result = Route.useSearch({
+  select: (search) => {
+    return {
+      date: new Date(),
+    };
+  },
+  structuralSharing: true,
+});
+```
+
+If structural sharing is enabled by default in the router options, you can prevent this error by setting `structuralSharing: false`.
+
+# Route Masking
+
+Route masking is a way to mask the actual URL of a route that gets persisted to the browser's history and URL bar. This is useful for scenarios where you want to show a different URL than the one that is actually being navigated to and then falling back to the displayed URL when it is shared and (optionally) when the page is reloaded. Here's a few examples:
+
+- Navigating to a modal route like `/photo/5/modal`, but masking the actual URL as `/photos/5`
+- Navigating to a modal route like `/post/5/comments`, but masking the actual URL as `/posts/5`
+- Navigating to a route with the search param `?showLogin=true`, but masking the URL to _not_ contain the search param
+- Navigating to a route with the search param `?modal=settings`, but masking the URL as `/settings'
+
+Each of these scenarios can be achieved with route masking and even extended to support more advanced patterns like [parallel routes](../parallel-routes.md).
+
+## How does route masking work?
+
+> [!IMPORTANT]
+> You **do not** need to understand how route masking works in order to use it. This section is for those who are curious about how it works under the hood. Skip to [How do I use route masking?](#how-do-i-use-route-masking) to learn how to use it!.
+
+Route masking utilizes the `location.state` API to store the desired runtime location inside of the location that will get written to the URL. It stores this runtime location under the `__tempLocation` state property:
+
+```tsx
+const location = {
+  pathname: "/photos/5",
+  search: "",
+  hash: "",
+  state: {
+    key: "wesdfs",
+    __tempKey: "sadfasd",
+    __tempLocation: {
+      pathname: "/photo/5/modal",
+      search: "",
+      hash: "",
+      state: {},
+    },
+  },
+};
+```
+
+When the router parses a location from history with the `location.state.__tempLocation` property, it will use that location instead of the one that was parsed from the URL. This allows you to navigate to a route like `/photos/5` and have the router actually navigate to `/photo/5/modal` instead. When this happens, the history location is saved back into the `location.maskedLocation` property, just in case we need to know what the **actual URL** is. One example of where this is used is in the Devtools where we detect if a route is masked and show the actual URL instead of the masked one!
+
+Remember, you don't need to worry about any of this. It's all handled for you automatically under the hood!
+
+## How do I use route masking?
+
+Route masking is a simple API that can be used in 2 ways:
+
+- Imperatively via the `mask` option available on the `<Link>` and `navigate()` APIs
+- Declaratively via the Router's `routeMasks` option
+
+When using either route masking APIs, the `mask` option accepts the same navigation object that the `<Link>` and `navigate()` APIs accept. This means you can use the same `to`, `replace`, `state`, and `search` options that you're already familiar with. The only difference is that the `mask` option will be used to mask the URL of the route being navigated to.
+
+> 🧠 The mask option is also **type-safe**! This means that if you're using TypeScript, you'll get type errors if you try to pass an invalid navigation object to the `mask` option. Booyah!
+
+### Imperative route masking
+
+The `<Link>` and `navigate()` APIs both accept a `mask` option that can be used to mask the URL of the route being navigated to. Here's an example of using it with the `<Link>` component:
+
+```tsx
+<Link
+  to="/photos/$photoId/modal"
+  params={{ photoId: 5 }}
+  mask={{
+    to: "/photos/$photoId",
+    params: {
+      photoId: 5,
+    },
+  }}
+>
+  Open Photo
+</Link>
+```
+
+And here's an example of using it with the `navigate()` API:
+
+```tsx
+const navigate = useNavigate();
+
+function onOpenPhoto() {
+  navigate({
+    to: "/photos/$photoId/modal",
+    params: { photoId: 5 },
+    mask: {
+      to: "/photos/$photoId",
+      params: {
+        photoId: 5,
+      },
+    },
+  });
+}
+```
+
+### Declarative route masking
+
+In addition to the imperative API, you can also use the Router's `routeMasks` option to declaratively mask routes. Instead of needing to pass the `mask` option to every `<Link>` or `navigate()` call, you can instead create a route mask on the Router to mask routes that match a certain pattern. Here's an example of the same route mask from above, but using the `routeMasks` option instead:
+
+// Use the following for the example below
+
+```tsx
+import { createRouteMask } from "@tanstack/react-router";
+
+const photoModalToPhotoMask = createRouteMask({
+  routeTree,
+  from: "/photos/$photoId/modal",
+  to: "/photos/$photoId",
+  params: (prev) => ({
+    photoId: prev.photoId,
+  }),
+});
+
+const router = createRouter({
+  routeTree,
+  routeMasks: [photoModalToPhotoMask],
+});
+```
+
+When creating a route mask, you'll need to pass 1 argument with at least:
+
+- `routeTree` - The route tree that the route mask will be applied to
+- `from` - The route ID that the route mask will be applied to
+- `...navigateOptions` - The standard `to`, `search`, `params`, `replace`, etc options that the `<Link>` and `navigate()` APIs accept
+
+> 🧠 The `createRouteMask` option is also **type-safe**! This means that if you're using TypeScript, you'll get type errors if you try to pass an invalid route mask to the `routeMasks` option.
+
+## Unmasking when sharing the URL
+
+URLs are automatically unmasked when they are shared since as soon as a URL is detached from your browsers local history stack, the URL masking data is no longer available. Essentially, as soon as you copy and paste a URL out of your history, its masking data is lost... after all, that's the point of masking a URL!
+
+## Local Unmasking Defaults
+
+**By default, URLs are not unmasked when the page is reloaded locally**. Masking data is stored in the `location.state` property of the history location, so as long as the history location is still in memory in your history stack, the masking data will be available and the URL will continue to be masked.
+
+## Unmasking on page reload
+
+**As stated above, URLs are not unmasked when the page is reloaded by default**.
+
+If you want to unmask a URL locally when the page is reloaded, you have 3 options, each overriding the previous one in priority if passed:
+
+- Set the Router's default `unmaskOnReload` option to `true`
+- Return the `unmaskOnReload: true` option from the masking function when creating a route mask with `createRouteMask()`
+- Pass the `unmaskOnReload: true` option to the `<Link`> component or `navigate()` API
+

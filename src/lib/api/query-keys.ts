@@ -1,4 +1,3 @@
-// Centralized query key management
 export const queryKeys = {
   services: {
     all: ['services'] as const,

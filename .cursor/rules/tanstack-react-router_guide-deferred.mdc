@@ -1,0 +1,493 @@
+---
+description: TanStack Router Guide: Deferred Data and External Loading
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# Deferred Data Loading
+
+TanStack Router is designed to run loaders in parallel and wait for all of them to resolve before rendering the next route. This is great most of the time, but occasionally, you may want to show the user something sooner while the rest of the data loads in the background.
+
+Deferred data loading is a pattern that allows the router to render the next location's critical data/markup while slower, non-critical route data is resolved in the background. This process works on both the client and server (via streaming) and is a great way to improve the perceived performance of your application.
+
+If you are using a library like [TanStack Query](https://react-query.tanstack.com) or any other data fetching library, then deferred data loading works a bit differently. Skip ahead to the [Deferred Data Loading with External Libraries](#deferred-data-loading-with-external-libraries) section for more information.
+
+## Deferred Data Loading with `Await`
+
+To defer slow or non-critical data, return an **unawaited/unresolved** promise anywhere in your loader response:
+
+```tsx
+// src/routes/posts.$postId.tsx
+import { createFileRoute, defer } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/posts/$postId")({
+  loader: async () => {
+    // Fetch some slower data, but do not await it
+    const slowDataPromise = fetchSlowData();
+
+    // Fetch and await some data that resolves quickly
+    const fastData = await fetchFastData();
+
+    return {
+      fastData,
+      deferredSlowData: slowDataPromise,
+    };
+  },
+});
+```
+
+As soon as any awaited promises are resolved, the next route will begin rendering while the deferred promises continue to resolve.
+
+In the component, deferred promises can be resolved and utilized using the `Await` component:
+
+```tsx
+// src/routes/posts.$postId.tsx
+import { createFileRoute, Await } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/posts/$postId")({
+  // ...
+  component: PostIdComponent,
+});
+
+function PostIdComponent() {
+  const { deferredSlowData, fastData } = Route.useLoaderData();
+
+  // do something with fastData
+
+  return (
+    <Await promise={deferredSlowData} fallback={<div>Loading...</div>}>
+      {(data) => {
+        return <div>{data}</div>;
+      }}
+    </Await>
+  );
+}
+```
+
+> [!TIP]
+> If your component is code-split, you can use the [getRouteApi function](../code-splitting.md#manually-accessing-route-apis-in-other-files-with-the-getrouteapi-helper) to avoid having to import the `Route` configuration to get access to the typed `useLoaderData()` hook.
+
+The `Await` component resolves the promise by triggering the nearest suspense boundary until it is resolved, after which it renders the component's `children` as a function with the resolved data.
+
+If the promise is rejected, the `Await` component will throw the serialized error, which can be caught by the nearest error boundary.
+
+[//]: # "DeferredWithAwaitFinalTip"
+
+> [!TIP]
+> In React 19, you can use the `use()` hook instead of `Await`
+
+[//]: # "DeferredWithAwaitFinalTip"
+
+## Deferred Data Loading with External libraries
+
+When your strategy for fetching information for the route relies on [External Data Loading](../external-data-loading.md) with an external library like [TanStack Query](https://tanstack.com/query), deferred data loading works a bit differently, as the library handles the data fetching and caching for you outside of TanStack Router.
+
+So, instead of using `defer` and `Await`, you'll instead want to use the Route's `loader` to kick off the data fetching and then use the library's hooks to access the data in your components.
+
+```tsx
+// src/routes/posts.$postId.tsx
+import { createFileRoute } from "@tanstack/react-router";
+import { slowDataOptions, fastDataOptions } from "~/api/query-options";
+
+export const Route = createFileRoute("/posts/$postId")({
+  loader: async ({ context: { queryClient } }) => {
+    // Kick off the fetching of some slower data, but do not await it
+    queryClient.prefetchQuery(slowDataOptions());
+
+    // Fetch and await some data that resolves quickly
+    await queryClient.ensureQueryData(fastDataOptions());
+  },
+});
+```
+
+Then in your component, you can use the library's hooks to access the data:
+
+```tsx
+// src/routes/posts.$postId.tsx
+import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { slowDataOptions, fastDataOptions } from "~/api/query-options";
+
+export const Route = createFileRoute("/posts/$postId")({
+  // ...
+  component: PostIdComponent,
+});
+
+function PostIdComponent() {
+  const fastData = useSuspenseQuery(fastDataOptions());
+
+  // do something with fastData
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SlowDataComponent />
+    </Suspense>
+  );
+}
+
+function SlowDataComponent() {
+  const data = useSuspenseQuery(slowDataOptions());
+
+  return <div>{data}</div>;
+}
+```
+
+## Caching and Invalidation
+
+Streamed promises follow the same lifecycle as the loader data they are associated with. They can even be preloaded!
+
+[//]: # "SSRContent"
+
+## SSR & Streaming Deferred Data
+
+**Streaming requires a server that supports it and for TanStack Router to be configured to use it properly.**
+
+Please read the entire [Streaming SSR Guide](../ssr.md#streaming-ssr) for step by step instructions on how to set up your server for streaming.
+
+## SSR Streaming Lifecycle
+
+The following is a high-level overview of how deferred data streaming works with TanStack Router:
+
+- Server
+  - Promises are marked and tracked as they are returned from route loaders
+  - All loaders resolve and any deferred promises are serialized and embedded into the html
+  - The route begins to render
+  - Deferred promises rendered with the `<Await>` component trigger suspense boundaries, allowing the server to stream html up to that point
+- Client
+  - The client receives the initial html from the server
+  - `<Await>` components suspend with placeholder promises while they wait for their data to resolve on the server
+- Server
+  - As deferred promises resolve, their results (or errors) are serialized and streamed to the client via an inline script tag
+  - The resolved `<Await>` components and their suspense boundaries are resolved and their resulting HTML is streamed to the client along with their dehydrated data
+- Client
+  - The suspended placeholder promises within `<Await>` are resolved with the streamed data/error responses and either render the result or throw the error to the nearest error boundary
+
+[//]: # "SSRContent"
+
+# Document Head Management
+
+Document head management is the process of managing the head, title, meta, link, and script tags of a document and TanStack Router provides a robust way to manage the document head for full-stack applications that use Start and for single-page applications that use `@tanstack/react-router`. It provides:
+
+- Automatic deduping of `title` and `meta` tags
+- Automatic loading/unloading of tags based on route visibility
+- A composable way to merge `title` and `meta` tags from nested routes
+
+For full-stack applications that use Start, and even for single-page applications that use `@tanstack/react-router`, managing the document head is a crucial part of any application for the following reasons:
+
+- SEO
+- Social media sharing
+- Analytics
+- CSS and JS loading/unloading
+
+To manage the document head, it's required that you render both the `<HeadContent />` and `<Scripts />` components and use the `routeOptions.head` property to manage the head of a route, which returns an object with `title`, `meta`, `links`, and `scripts` properties.
+
+## Managing the Document Head
+
+```tsx
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      {
+        name: "description",
+        content: "My App is a web application",
+      },
+      {
+        title: "My App",
+      },
+    ],
+    links: [
+      {
+        rel: "icon",
+        href: "/favicon.ico",
+      },
+    ],
+    scripts: [
+      {
+        src: "https://www.google-analytics.com/analytics.js",
+      },
+    ],
+  }),
+});
+```
+
+### Deduping
+
+Out of the box, TanStack Router will dedupe `title` and `meta` tags, preferring the **last** occurrence of each tag found in nested routes.
+
+- `title` tags defined in nested routes will override a `title` tag defined in a parent route (but you can compose them together, which is covered in a future section of this guide)
+- `meta` tags with the same `name` or `property` will be overridden by the last occurrence of that tag found in nested routes
+
+### `<HeadContent />`
+
+The `<HeadContent />` component is **required** to render the head, title, meta, link, and head-related script tags of a document.
+
+It should be **rendered either in the `<head>` tag of your root layout or as high up in the component tree as possible** if your application doesn't or can't manage the `<head>` tag.
+
+### Start/Full-Stack Applications
+
+```tsx
+import { HeadContent } from "@tanstack/react-router";
+
+export const Route = createRootRoute({
+  component: () => (
+    <html>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <Outlet />
+      </body>
+    </html>
+  ),
+});
+```
+
+### Single-Page Applications
+
+```tsx
+import { HeadContent } from "@tanstack/react-router";
+
+const rootRoute = createRootRoute({
+  component: () => (
+    <>
+      <HeadContent />
+      <Outlet />
+    </>
+  ),
+});
+```
+
+## Managing Body Scripts
+
+In addition to scripts that can be rendered in the `<head>` tag, you can also render scripts in the `<body>` tag using the `routeOptions.scripts` property. This is useful for loading scripts (even inline scripts) that require the DOM to be loaded, but before the main entry point of your application (which includes hydration if you're using Start or a full-stack implementation of TanStack Router).
+
+To do this, you must:
+
+- Use the `scripts` property of the `routeOptions` object
+- [Render the `<Scripts />` component](#scripts)
+
+```tsx
+export const Route = createRootRoute({
+  scripts: [
+    {
+      children: 'console.log("Hello, world!")',
+    },
+  ],
+});
+```
+
+### `<Scripts />`
+
+The `<Scripts />` component is **required** to render the body scripts of a document. It should be rendered either in the `<body>` tag of your root layout or as high up in the component tree as possible if your application doesn't or can't manage the `<body>` tag.
+
+### Example
+
+```tsx
+import { createFileRoute, Scripts } from "@tanstack/react-router";
+export const Router = createFileRoute("/")({
+  component: () => (
+    <html>
+      <head />
+      <body>
+        <Outlet />
+        <Scripts />
+      </body>
+    </html>
+  ),
+});
+```
+
+```tsx
+import { Scripts, createRootRoute } from "@tanstack/react-router";
+
+export const Route = createRootRoute({
+  component: () => (
+    <>
+      <Outlet />
+      <Scripts />
+    </>
+  ),
+});
+```
+
+# External Data Loading
+
+> [!IMPORTANT]
+> This guide is geared towards external state management libraries and their integration with TanStack Router for data fetching, ssr, hydration/dehydration and streaming. If you haven't read the standard [Data Loading](../data-loading.md) guide, please do so first.
+
+## To **Store** or to **Coordinate**?
+
+While Router is very capable of storing and managing most data needs out of the box, sometimes you just might want something more robust!
+
+Router is designed to be a perfect **coordinator** for external data fetching and caching libraries. This means that you can use any data fetching/caching library you want, and the router will coordinate the loading of your data in a way that aligns with your users' navigation and expectations of freshness.
+
+## What data fetching libraries are supported?
+
+Any data fetching library that supports asynchronous promises can be used with TanStack Router. This includes:
+
+- [TanStack Query](https://tanstack.com/query/latest/docs/react/overview)
+- [SWR](https://swr.vercel.app/)
+- [RTK Query](https://redux-toolkit.js.org/rtk-query/overview)
+- [urql](https://formidable.com/open-source/urql/)
+- [Relay](https://relay.dev/)
+- [Apollo](https://www.apollographql.com/docs/react/)
+
+Or, even...
+
+- [Zustand](https://zustand-demo.pmnd.rs/)
+- [Jotai](https://jotai.org/)
+- [Recoil](https://recoiljs.org/)
+- [Redux](https://redux.js.org/)
+
+Literally any library that **can return a promise and read/write data** can be integrated.
+
+## Using Loaders to ensure data is loaded
+
+The easiest way to use integrate and external caching/data library into Router is to use `route.loader`s to ensure that the data required inside of a route has been loaded and is ready to be displayed.
+
+> ⚠️ BUT WHY? It's very important to preload your critical render data in the loader for a few reasons:
+>
+> - No "flash of loading" states
+> - No waterfall data fetching, caused by component based fetching
+> - Better for SEO. If your data is available at render time, it will be indexed by search engines.
+
+Here is a naive illustration (don't do this) of using a Route's `loader` option to seed the cache for some data:
+
+```tsx
+// src/routes/posts.tsx
+let postsCache = [];
+
+export const Route = createFileRoute({
+  loader: async () => {
+    postsCache = await fetchPosts();
+  },
+  component: () => {
+    return (
+      <div>
+        {postsCache.map((post) => (
+          <Post key={post.id} post={post} />
+        ))}
+      </div>
+    );
+  },
+});
+```
+
+This example is **obviously flawed**, but illustrates the point that you can use a route's `loader` option to seed your cache with data. Let's take a look at a more realistic example using TanStack Query.
+
+- Replace `fetchPosts` with your preferred data fetching library's prefetching API
+- Replace `postsCache` with your preferred data fetching library's read-or-fetch API or hook
+
+## A more realistic example using TanStack Query
+
+Let's take a look at a more realistic example using TanStack Query.
+
+```tsx
+// src/routes/posts.tsx
+const postsQueryOptions = queryOptions({
+  queryKey: ["posts"],
+  queryFn: () => fetchPosts(),
+});
+
+export const Route = createFileRoute({
+  // Use the `loader` option to ensure that the data is loaded
+  loader: () => queryClient.ensureQueryData(postsQueryOptions),
+  component: () => {
+    // Read the data from the cache and subscribe to updates
+    const {
+      data: { posts },
+    } = useSuspenseQuery(postsQueryOptions);
+
+    return (
+      <div>
+        {posts.map((post) => (
+          <Post key={post.id} post={post} />
+        ))}
+      </div>
+    );
+  },
+});
+```
+
+### Error handling with TanStack Query
+
+When an error occurs while using `suspense` with `Tanstack Query`, you'll need to let queries know that you want to try again when re-rendering. This can be done by using the `reset` function provided by the `useQueryErrorResetBoundary` hook. We can invoke this function in an effect as soon as the error component mounts. This will make sure that the query is reset and will try to fetch data again when the route component is rendered again. This will also cover cases where users navigate away from our route instead of clicking the `retry` button.
+
+```tsx
+export const Route = createFileRoute({
+  loader: () => queryClient.ensureQueryData(postsQueryOptions),
+  errorComponent: ({ error, reset }) => {
+    const router = useRouter();
+    const queryErrorResetBoundary = useQueryErrorResetBoundary();
+
+    useEffect(() => {
+      // Reset the query error boundary
+      queryErrorResetBoundary.reset();
+    }, [queryErrorResetBoundary]);
+
+    return (
+      <div>
+        {error.message}
+        <button
+          onClick={() => {
+            // Invalidate the route to reload the loader, and reset any router error boundaries
+            router.invalidate();
+          }}
+        >
+          retry
+        </button>
+      </div>
+    );
+  },
+});
+```
+
+## SSR Dehydration/Hydration
+
+Tools that are able can integrate with TanStack Router's convenient Dehydration/Hydration APIs to shuttle dehydrated data between the server and client and rehydrate it where needed. Let's go over how to do this with both 3rd party critical data and 3rd party deferred data.
+
+## Critical Dehydration/Hydration
+
+**For critical data needed for the first render/paint**, TanStack Router supports **`dehydrate` and `hydrate`** options when configuring the `Router`. These callbacks are functions that are automatically called on the server and client when the router dehydrates and hydrates normally and allow you to augment the dehydrated data with your own data.
+
+The `dehydrate` function can return any serializable JSON data which will get merged and injected into the dehydrated payload that is sent to the client. This payload is delivered via the `DehydrateRouter` component which, when rendered, provides the data back to you in the `hydrate` function on the client.
+
+For example, let's dehydrate and hydrate a TanStack Query `QueryClient` so that our data we fetched on the server will be available for hydration on the client.
+
+```tsx
+// src/router.tsx
+
+export function createRouter() {
+  // Make sure you create your loader client or similar data
+  // stores inside of your `createRouter` function. This ensures
+  // that your data stores are unique to each request and
+  // always present on both server and client.
+  const queryClient = new QueryClient();
+
+  return createRouter({
+    routeTree,
+    // Optionally provide your loaderClient to the router context for
+    // convenience (you can provide anything you want to the router
+    // context!)
+    context: {
+      queryClient,
+    },
+    // On the server, dehydrate the loader client so the router
+    // can serialize it and send it to the client for us
+    dehydrate: () => {
+      return {
+        queryClientState: dehydrate(queryClient),
+      };
+    },
+    // On the client, hydrate the loader client with the data
+    // we dehydrated on the server
+    hydrate: (dehydrated) => {
+      hydrate(queryClient, dehydrated.queryClientState);
+    },
+    // Optionally, we can use `Wrap` to wrap our router in the loader client provider
+    Wrap: ({ children }) => {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    },
+  });
+}
+```
+

@@ -1,0 +1,815 @@
+---
+description: TanStack Router: API Core Types (Link, Navigate, Match, Route)
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# ActiveLinkOptions type
+
+The `ActiveLinkOptions` type extends the [`LinkOptions`](../LinkOptionsType.md) type and contains additional options that can be used to describe how a link should be styled when it is active.
+
+```tsx
+type ActiveLinkOptions = LinkOptions & {
+  activeProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
+  inactiveProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
+}
+```
+
+## ActiveLinkOptions properties
+
+The `ActiveLinkOptions` object accepts/contains the following properties:
+
+### `activeProps`
+
+- `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is active
+
+### `inactiveProps`
+
+- Type: `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is inactive
+
+# AsyncRouteComponent type
+
+The `AsyncRouteComponent` type is used to describe a code-split route component that can be preloaded using a `component.preload()` method.
+
+```tsx
+type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
+  preload?: () => Promise<void>
+}
+```
+
+# FileRoute class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createFileRoute`](../createFileRouteFunction.md) function instead.
+
+The `FileRoute` class is a factory that can be used to create a file-based route instance. This route instance can then be used to automatically generate a route tree with the `tsr generate` and `tsr watch` commands.
+
+## `FileRoute` constructor
+
+The `FileRoute` constructor accepts a single argument: the `path` of the file that the route will be generated for.
+
+### Constructor options
+
+- Type: `string` literal
+- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**.
+- The full path of the file that the route will be generated from.
+
+### Constructor returns
+
+- An instance of the `FileRoute` class that can be used to create a route.
+
+## `FileRoute` methods
+
+The `FileRoute` class implements the following method(s):
+
+### `.createRoute` method
+
+The `createRoute` method is a method that can be used to configure the file route instance. It accepts a single argument: the `options` that will be used to configure the file route instance.
+
+#### .createRoute options
+
+- Type: `Omit<RouteOptions, 'getParentRoute' | 'path' | 'id'>`
+- [`RouteOptions`](../RouteOptionsType.md)
+- Optional
+- The same options that are available to the `Route` class, but with the `getParentRoute`, `path`, and `id` options omitted since they are unnecessary for file-based routing.
+
+#### .createRoute returns
+
+A [`Route`](../RouteType.md) instance that can be used to configure the route to be inserted into the route-tree.
+
+> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
+
+### Examples
+
+```tsx
+import { FileRoute } from '@tanstack/react-router'
+
+export const Route = new FileRoute('/').createRoute({
+  loader: () => {
+    return 'Hello World'
+  },
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# LinkOptions type
+
+The `LinkOptions` type extends the [`NavigateOptions`](../NavigateOptionsType.md) type and contains additional options that can be used by TanStack Router when handling actual anchor element attributes.
+
+```tsx
+type LinkOptions = NavigateOptions & {
+  target?: HTMLAnchorElement['target']
+  activeOptions?: ActiveOptions
+  preload?: false | 'intent'
+  preloadDelay?: number
+  disabled?: boolean
+}
+```
+
+## LinkOptions properties
+
+The `LinkOptions` object accepts/contains the following properties:
+
+### `target`
+
+- Type: `HTMLAnchorElement['target']`
+- Optional
+- The standard anchor tag target attribute
+
+### `activeOptions`
+
+- Type: `ActiveOptions`
+- Optional
+- The options that will be used to determine if the link is active
+
+### `preload`
+
+- Type: `false | 'intent' | 'viewport' | 'render'`
+- Optional
+- If set, the link's preloading strategy will be set to this value.
+- See the [Preloading guide](../../../guide/preloading.md) for more information.
+
+### `preloadDelay`
+
+- Type: `number`
+- Optional
+- Delay intent preloading by this many milliseconds. If the intent exits before this delay, the preload will be cancelled.
+
+### `disabled`
+
+- Type: `boolean`
+- Optional
+- If true, will render the link without the href attribute
+
+# LinkProps type
+
+The `LinkProps` type extends the [`ActiveLinkOptions`](../ActiveLinkOptionsType.md) and `React.AnchorHTMLAttributes<HTMLAnchorElement>` types and contains additional props specific to the `Link` component.
+
+```tsx
+type LinkProps = ActiveLinkOptions &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
+    children?:
+      | React.ReactNode
+      | ((state: { isActive: boolean }) => React.ReactNode)
+  }
+```
+
+## LinkProps properties
+
+- All of the props from [`ActiveLinkOptions`](../ActiveLinkOptionsType.md)
+- All of the props from `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+
+#### `children`
+
+- Type: `React.ReactNode | ((state: { isActive: boolean }) => React.ReactNode)`
+- Optional
+- The children that will be rendered inside of the anchor element. If a function is provided, it will be called with an object that contains the `isActive` boolean value that can be used to determine if the link is active.
+
+# MatchRouteOptions type
+
+The `MatchRouteOptions` type is used to describe the options that can be used when matching a route.
+
+```tsx
+interface MatchRouteOptions {
+  pending?: boolean
+  caseSensitive?: boolean
+  includeSearch?: boolean
+  fuzzy?: boolean
+}
+```
+
+## MatchRouteOptions properties
+
+The `MatchRouteOptions` type has the following properties:
+
+### `pending` property
+
+- Type: `boolean`
+- Optional
+- If `true`, will match against pending location instead of the current location
+
+### `caseSensitive` property
+
+- Type: `boolean`
+- Optional
+- If `true`, will match against the current location with case sensitivity
+
+### `includeSearch` property
+
+- Type: `boolean`
+- Optional
+- If `true`, will match against the current location's search params using a deep inclusive check. e.g. `{ a: 1 }` will match for a current location of `{ a: 1, b: 2 }`
+
+### `fuzzy` property
+
+- Type: `boolean`
+- Optional
+- If `true`, will match against the current location using a fuzzy match. e.g. `/posts` will match for a current location of `/posts/123`
+
+# NavigateOptions type
+
+The `NavigateOptions` type is used to describe the options that can be used when describing a navigation action in TanStack Router.
+
+```tsx
+type NavigateOptions = ToOptions & {
+  replace?: boolean
+  resetScroll?: boolean
+  hashScrollIntoView?: boolean | ScrollIntoViewOptions
+  viewTransition?: boolean | ViewTransitionOptions
+  ignoreBlocker?: boolean
+  reloadDocument?: boolean
+  href?: string
+}
+```
+
+## NavigateOptions properties
+
+The `NavigateOptions` object accepts the following properties:
+
+### `replace`
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`.
+- If `true`, the location will be committed to the browser history using `history.replace` instead of `history.push`.
+
+### `resetScroll`
+
+- Type: `boolean`
+- Optional
+- Defaults to `true` so that the scroll position will be reset to 0,0 after the location is committed to the browser history.
+- If `false`, the scroll position will not be reset to 0,0 after the location is committed to history.
+
+### `hashScrollIntoView`
+
+- Type: `boolean | ScrollIntoViewOptions`
+- Optional
+- Defaults to `true` so the element with an id matching the hash will be scrolled into view after the location is committed to history.
+- If `false`, the element with an id matching the hash will not be scrolled into view after the location is committed to history.
+- If an object is provided, it will be passed to the `scrollIntoView` method as options.
+- See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) for more information on `ScrollIntoViewOptions`.
+
+### `viewTransition`
+
+- Type: `boolean | ViewTransitionOptions`
+- Optional
+- Defaults to `false`.
+- If `true`, navigation will be called using `document.startViewTransition()`.
+- If [`ViewTransitionOptions`](../ViewTransitionOptionsType.md), route navigations will be called using `document.startViewTransition({update, types})` where `types` will be the strings array passed with `ViewTransitionOptions["types"]`. If the browser does not support viewTransition types, the navigation will fall back to normal `document.startTransition()`, same as if `true` was passed.
+- If the browser does not support this api, this option will be ignored.
+- See [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition) for more information on how this function works.
+- See [Google](https://developer.chrome.com/docs/web-platform/view-transitions/same-document#view-transition-types) for more information on viewTransition types
+
+### `ignoreBlocker`
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`.
+- If `true`, navigation will ignore any blockers that might prevent it.
+
+### `reloadDocument`
+
+- Type: `boolean`
+- Optional
+- Defaults to `false`.
+- If `true`, navigation to a route inside of router will trigger a full page load instead of the traditional SPA navigation.
+
+### `href`
+
+- Type: `string`
+- Optional
+- This can be used instead of `to` to navigate to a fully built href, e.g. pointing to an external target.
+
+- [`ToOptions`](../ToOptionsType.md)
+
+# NotFoundError
+
+The `NotFoundError` type is used to represent a not-found error in TanStack Router.
+
+```tsx
+export type NotFoundError = {
+  global?: boolean
+  data?: any
+  throw?: boolean
+  routeId?: string
+}
+```
+
+## NotFoundError properties
+
+The `NotFoundError` object accepts/contains the following properties:
+
+### `data` property
+
+- Type: `any`
+- Optional
+- Custom data that is passed into to `notFoundComponent` when the not-found error is handled
+
+### `global` property
+
+- Type: `boolean`
+- Optional - `default: false`
+- If true, the not-found error will be handled by the `notFoundComponent` of the root route instead of bubbling up from the route that threw it. This has the same behavior as importing the root route and calling `RootRoute.notFound()`.
+
+### `route` property
+
+- Type: `string`
+- Optional
+- The ID of the route that will attempt to handle the not-found error. If the route does not have a `notFoundComponent`, the error will bubble up to the parent route (and be handled by the root route if necessary). By default, TanStack Router will attempt to handle the not-found error with the route that threw it.
+
+### `throw` property
+
+- Type: `boolean`
+- Optional - `default: false`
+- If provided, will throw the not-found object instead of returning it. This can be useful in places where `throwing` in a function might cause it to have a return type of `never`. In that case, you can use `notFound({ throw: true })` to throw the not-found object instead of returning it.
+
+# NotFoundRoute class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the `notFoundComponent` route option that is present during route configuration.
+> See the [Not Found Errors guide](../../../guide/not-found-errors.md) for more information.
+
+The `NotFoundRoute` class extends the `Route` class and can be used to create a not found route instance. A not found route instance can be passed to the `routerOptions.notFoundRoute` option to configure a default not-found/404 route for every branch of the route tree.
+
+## Constructor options
+
+The `NotFoundRoute` constructor accepts an object as its only argument.
+
+- Type:
+
+```tsx
+Omit<
+  RouteOptions,
+  | 'path'
+  | 'id'
+  | 'getParentRoute'
+  | 'caseSensitive'
+  | 'parseParams'
+  | 'stringifyParams'
+>
+```
+
+- [RouteOptions](../RouteOptionsType.md)
+- Required
+- The options that will be used to configure the not found route instance.
+
+## Examples
+
+```tsx
+import { NotFoundRoute, createRouter } from '@tanstack/react-router'
+import { Route as rootRoute } from './routes/__root'
+import { routeTree } from './routeTree.gen'
+
+const notFoundRoute = new NotFoundRoute({
+  getParentRoute: () => rootRoute,
+  component: () => <div>Not found!!!</div>,
+})
+
+const router = createRouter({
+  routeTree,
+  notFoundRoute,
+})
+
+// ... other code
+```
+
+# ParsedHistoryState type
+
+The `ParsedHistoryState` type represents a parsed state object. Additionally to `HistoryState`, it contains the index and the unique key of the route.
+
+```tsx
+export type ParsedHistoryState = HistoryState & {
+  key?: string
+  __TSR_index: number
+}
+```
+
+# ParsedLocation type
+
+The `ParsedLocation` type represents a parsed location in TanStack Router. It contains a lot of useful information about the current location, including the pathname, search params, hash, location state, and route masking information.
+
+```tsx
+interface ParsedLocation {
+  href: string
+  pathname: string
+  search: TFullSearchSchema
+  searchStr: string
+  state: ParsedHistoryState
+  hash: string
+  maskedLocation?: ParsedLocation
+  unmaskOnReload?: boolean
+}
+```
+
+# Redirect type
+
+The `Redirect` type is used to represent a redirect action in TanStack Router.
+
+```tsx
+export type Redirect = {
+  statusCode?: number
+  throw?: any
+  headers?: HeadersInit
+} & NavigateOptions
+```
+
+- [`NavigateOptions`](../NavigateOptionsType.md)
+
+## Redirect properties
+
+The `Redirect` object accepts/contains the following properties:
+
+### `statusCode` property
+
+- Type: `number`
+- Optional
+- The HTTP status code to use when redirecting
+
+### `throw` property
+
+- Type: `any`
+- Optional
+- If provided, will throw the redirect object instead of returning it. This can be useful in places where `throwing` in a function might cause it to have a return type of `never`. In that case, you can use `redirect({ throw: true })` to throw the redirect object instead of returning it.
+
+### `headers` property
+
+- Type: `HeadersInit`
+- Optional
+- The HTTP headers to use when redirecting.
+
+# Register type
+
+This type is used to register a route tree with a router instance. Doing so unlocks the full type safety of TanStack Router, including top-level exports from the `@tanstack/react-router` package.
+
+```tsx
+export type Register = {
+  // router: [Your router type here]
+}
+```
+
+To register a route tree with a router instance, use declaration merging to add the type of your router instance to the Register interface under the `router` property:
+
+## Examples
+
+```tsx
+const router = createRouter({
+  // ...
+})
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}
+```
+
+# RootRoute class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createRootRoute`](../createRootRouteFunction.md) function instead.
+
+The `RootRoute` class extends the `Route` class and can be used to create a root route instance. A root route instance can then be used to create a route tree.
+
+## `RootRoute` constructor
+
+The `RootRoute` constructor accepts an object as its only argument.
+
+### Constructor options
+
+The options that will be used to configure the root route instance.
+
+- Type:
+
+```tsx
+Omit<
+  RouteOptions,
+  | 'path'
+  | 'id'
+  | 'getParentRoute'
+  | 'caseSensitive'
+  | 'parseParams'
+  | 'stringifyParams'
+>
+```
+
+- [`RouteOptions`](../RouteOptionsType.md)
+- Optional
+
+## Constructor returns
+
+A new [`Route`](../RouteType.md) instance.
+
+## Examples
+
+```tsx
+import { RootRoute, createRouter, Outlet } from '@tanstack/react-router'
+
+const rootRoute = new RootRoute({
+  component: () => <Outlet />,
+  // ... root route options
+})
+
+const routeTree = rootRoute.addChildren([
+  // ... other routes
+])
+
+const router = createRouter({
+  routeTree,
+})
+```
+
+# RouteApi class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`getRouteApi`](../getRouteApiFunction.md) function instead.
+
+The `RouteApi` class provides type-safe version of common hooks like `useParams`, `useSearch`, `useRouteContext`, `useNavigate`, `useLoaderData`, and `useLoaderDeps` that are pre-bound to a specific route ID and corresponding registered route types.
+
+## Constructor options
+
+The `RouteApi` constructor accepts a single argument: the `options` that will be used to configure the `RouteApi` instance.
+
+### `opts.routeId` option
+
+- Type: `string`
+- Required
+- The route ID to which the `RouteApi` instance will be bound
+
+## Constructor returns
+
+- An instance of the [`RouteApi`](../RouteApiType.md) that is pre-bound to the route ID that it was called with.
+
+## Examples
+
+```tsx
+import { RouteApi } from '@tanstack/react-router'
+
+const routeApi = new RouteApi({ id: '/posts' })
+
+export function PostsPage() {
+  const posts = routeApi.useLoaderData()
+  // ...
+}
+```
+
+# RouteApi Type
+
+The `RouteApi` describes an instance that provides type-safe versions of common hooks like `useParams`, `useSearch`, `useRouteContext`, `useNavigate`, `useLoaderData`, and `useLoaderDeps` that are pre-bound to a specific route ID and corresponding registered route types.
+
+## `RouteApi` properties and methods
+
+The `RouteApi` has the following properties and methods:
+
+### `useMatch` method
+
+```tsx
+  useMatch<TSelected = TAllContext>(opts?: {
+    select?: (match: TAllContext) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useMatch`](../useMatchHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: RouteMatch) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useMatch`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+  - `opts.structuralSharing`
+    - Optional
+    - `boolean`
+    - Configures whether structural sharing is enabled for the value returned by `select`.
+    - See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `RouteMatch` object or a loosened version of the `RouteMatch` object if `opts.strict` is `false`.
+
+### `useRouteContext` method
+
+```tsx
+  useRouteContext<TSelected = TAllContext>(opts?: {
+    select?: (search: TAllContext) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useRouteContext`](../useRouteContextHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: RouteContext) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useRouteContext`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `RouteContext` object or a loosened version of the `RouteContext` object if `opts.strict` is `false`.
+
+### `useSearch` method
+
+```tsx
+  useSearch<TSelected = TFullSearchSchema>(opts?: {
+    select?: (search: TFullSearchSchema) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useSearch`](../useSearchHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: TFullSearchSchema) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useSearch`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+  - `opts.structuralSharing`
+    - Optional
+    - `boolean`
+    - Configures whether structural sharing is enabled for the value returned by `select`.
+    - See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `TFullSearchSchema` object or a loosened version of the `TFullSearchSchema` object if `opts.strict` is `false`.
+
+### `useParams` method
+
+```tsx
+  useParams<TSelected = TAllParams>(opts?: {
+    select?: (params: TAllParams) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useParams`](../useParamsHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: TAllParams) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useParams`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+  - `opts.structuralSharing`
+    - Optional
+    - `boolean`
+    - Configures whether structural sharing is enabled for the value returned by `select`.
+    - See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `TAllParams` object or a loosened version of the `TAllParams` object if `opts.strict` is `false`.
+
+### `useLoaderData` method
+
+```tsx
+  useLoaderData<TSelected = TLoaderData>(opts?: {
+    select?: (search: TLoaderData) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useLoaderData`](../useLoaderDataHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: TLoaderData) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useLoaderData`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+  - `opts.structuralSharing`
+    - Optional
+    - `boolean`
+    - Configures whether structural sharing is enabled for the value returned by `select`.
+    - See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `TLoaderData` object or a loosened version of the `TLoaderData` object if `opts.strict` is `false`.
+
+### `useLoaderDeps` method
+
+```tsx
+  useLoaderDeps<TSelected = TLoaderDeps>(opts?: {
+    select?: (search: TLoaderDeps) => TSelected
+  }): TSelected
+```
+
+- A type-safe version of the [`useLoaderDeps`](../useLoaderDepsHook.md) hook that is pre-bound to the route ID that the `RouteApi` instance was created with.
+- Options
+  - `opts.select`
+    - Optional
+    - `(match: TLoaderDeps) => TSelected`
+    - If supplied, this function will be called with the route match and the return value will be returned from `useLoaderDeps`.
+  - `opts.structuralSharing`
+    - Optional
+    - `boolean`
+    - Configures whether structural sharing is enabled for the value returned by `select`.
+    - See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+- Returns
+  - If a `select` function is provided, the return value of the `select` function.
+  - If no `select` function is provided, the `TLoaderDeps` object.
+
+### `useNavigate` method
+
+```tsx
+  useNavigate(): // navigate function
+```
+
+- A type-safe version of [`useNavigate`](../useNavigateHook.md) that is pre-bound to the route ID that the `RouteApi` instance was created with.
+
+# Route class
+
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createRoute`](../createRouteFunction.md) function instead.
+
+The `Route` class implements the `RouteApi` class and can be used to create route instances. A route instance can then be used to create a route tree.
+
+## `Route` constructor
+
+The `Route` constructor accepts an object as its only argument.
+
+### Constructor options
+
+- Type: [`RouteOptions`](../RouteOptionsType.md)
+- Required
+- The options that will be used to configure the route instance
+
+### Constructor returns
+
+A new [`Route`](../RouteType.md) instance.
+
+## Examples
+
+```tsx
+import { Route } from '@tanstack/react-router'
+import { rootRoute } from './__root'
+
+const indexRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  loader: () => {
+    return 'Hello World'
+  },
+  component: IndexComponent,
+})
+
+function IndexComponent() {
+  const data = indexRoute.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# RouteMask type
+
+The `RouteMask` type extends the [`ToOptions`](../ToOptionsType.md) type and has other the necessary properties to create a route mask.
+
+## RouteMask properties
+
+The `RouteMask` type accepts an object with the following properties:
+
+### `...ToOptions`
+
+- Type: [`ToOptions`](../ToOptionsType.md)
+- Required
+- The options that will be used to configure the route mask
+
+### `options.routeTree`
+
+- Type: `TRouteTree`
+- Required
+- The route tree that this route mask will support
+
+### `options.unmaskOnReload`
+
+- Type: `boolean`
+- Optional
+- If `true`, the route mask will be removed when the page is reloaded
+
+# RouteMatch type
+
+The `RouteMatch` type represents a route match in TanStack Router.
+
+```tsx
+interface RouteMatch {
+  id: string
+  routeId: string
+  pathname: string
+  params: Route['allParams']
+  status: 'pending' | 'success' | 'error'
+  isFetching: boolean
+  showPending: boolean
+  error: unknown
+  paramsError: unknown
+  searchError: unknown
+  updatedAt: number
+  loadPromise?: Promise<void>
+  loaderData?: Route['loaderData']
+  context: Route['allContext']
+  search: Route['fullSearchSchema']
+  fetchedAt: number
+  abortController: AbortController
+  cause: 'enter' | 'stay'
+}
+```
+

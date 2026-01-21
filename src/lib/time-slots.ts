@@ -29,6 +29,7 @@ export function generateTimeSlots(
   durationMinutes: number
 ): TimeSlot[] {
   const slots: TimeSlot[] = []
+  if (!ranges) return [];
 
   for (const range of ranges) {
     const rangeStart = timeToMinutes(range.start)
@@ -36,6 +37,7 @@ export function generateTimeSlots(
 
     // Generate slots within this range
     let currentStart = rangeStart
+    const step = 10;
 
     while (currentStart + durationMinutes <= rangeEnd) {
       const slotEnd = currentStart + durationMinutes
@@ -50,7 +52,7 @@ export function generateTimeSlots(
       })
 
       // Move to next slot (no overlap, start next slot where previous ended)
-      currentStart = slotEnd
+      currentStart = currentStart + step
     }
   }
 

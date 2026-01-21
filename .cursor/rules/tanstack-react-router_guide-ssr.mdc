@@ -1,0 +1,987 @@
+---
+description: TanStack Router Guide: SSR, TanStack Start, Type Safety
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# SSR
+
+Server Side Rendering (SSR) is the process of rendering a component on the server and sending the HTML markup to the client. The client then hydrates the markup into a fully interactive component.
+
+There are usually two different flavors of SSR to be considered:
+
+- Non-streaming SSR
+  - The entire page is rendered on the server and sent to the client in one single HTML request, including the serialized data the application needs to hydrate on the client.
+- Streaming SSR
+  - The critical first paint of the page is rendered on the server and sent to the client in one single HTML request, including the serialized data the application needs to hydrate on the client
+  - The rest of the page is then streamed to the client as it is rendered on the server.
+
+This guide will explain how to implement both flavors of SSR with TanStack Router!
+
+## Non-Streaming SSR
+
+Non-Streaming server-side rendering is the classic process of rendering the markup for your entire application page on the server and sending the completed HTML markup (and data) to the client. The client then hydrates the markup into a fully interactive application again.
+
+To implement non-streaming SSR with TanStack Router, you will need the following utilities:
+
+- `StartServer` from `@tanstack/react-start/server`
+  - e.g. `<StartServer router={router} />`
+  - Rendering this component in your server entry will render your application and also automatically handle application-level hydration/dehydration and implement the `Wrap` component option on `Router`
+- `StartClient` from `@tanstack/react-start`
+  - e.g. `<StartClient router={router} />`
+  - Rendering this component in your client entry will render your application and also automatically implement the `Wrap` component option on `Router`
+
+### Router Creation
+
+Since your router will exist both on the server and the client, it's important that you create your router in a way that is consistent between both of these environments. The easiest way to do this is to expose a `createRouter` function in a shared file that can be imported and called by both your server and client entry files.
+
+- `src/router.tsx`
+
+```tsx
+import * as React from "react";
+import { createRouter as createTanstackRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
+
+export function createRouter() {
+  return createTanstackRouter({ routeTree });
+}
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof createRouter>;
+  }
+}
+```
+
+Now you can import this function in both your server and client entry files and create your router.
+
+- `src/entry-server.tsx`
+
+```tsx
+import { createRouter } from "./router";
+
+export async function render(req, res) {
+  const router = createRouter();
+}
+```
+
+- `src/entry-client.tsx`
+
+```tsx
+import { createRouter } from "./router";
+
+const router = createRouter();
+```
+
+### Server History
+
+On the client, Router defaults to using an instance of `createBrowserHistory`, which is the preferred type of history to use on the client. On the server, however, you will want to use an instance of `createMemoryHistory` instead. This is because `createBrowserHistory` uses the `window` object, which does not exist on the server.
+
+> 🧠 Make sure you initialize your memory history with the server URL that is being rendered.
+
+- `src/entry-server.tsx`
+
+```tsx
+const router = createRouter();
+
+const memoryHistory = createMemoryHistory({
+  initialEntries: [opts.url],
+});
+```
+
+After creating the memory history instance, you can update the router to use it.
+
+- `src/entry-server.tsx`
+
+```tsx
+router.update({
+  history: memoryHistory,
+});
+```
+
+### Loading Critical Router Data on the Server
+
+In order to render your application on the server, you will need to ensure that the router has loaded any critical data via it's route loaders. To do this, you can `await router.load()` before rendering your application. This will quite literally wait for each of the matching route matches found for this url to run their route's `loader` functions in parallel.
+
+- `src/entry-server.tsx`
+
+```tsx
+await router.load();
+```
+
+## Automatic Loader Dehydration/Hydration
+
+Resolved loader data fetched by routes is automatically dehydrated and rehydrated by TanStack Router so long as you complete the standard SSR steps outlined in this guide.
+
+⚠️ If you are using deferred data streaming, you will also need to ensure that you have implemented the [SSR Streaming & Stream Transform](#streaming-ssr) pattern near the end of this guide.
+
+For more information on how to utilize data loading, see the [Data Loading](../data-loading.md) guide.
+
+### Rendering the Application on the Server
+
+Now that you have a router instance that has loaded all of the critical data for the current URL, you can render your application on the server:
+
+```tsx
+// src/entry-server.tsx
+
+const html = ReactDOMServer.renderToString(<StartServer router={router} />);
+```
+
+### Handling Not Found Errors
+
+`router` has a method `hasNotFoundMatch` to check if a not-found error has occurred during the rendering process. Use this method to check if a not-found error has occurred and set the response status code accordingly:
+
+```tsx
+// src/entry-server.tsx
+if (router.hasNotFoundMatch()) statusCode = 404;
+```
+
+### All Together Now
+
+Here is a complete example of a server entry file that uses all of the concepts discussed above.
+
+```tsx
+// src/entry-server.tsx
+import * as React from "react";
+import ReactDOMServer from "react-dom/server";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { StartServer } from "@tanstack/react-start/server";
+import { createRouter } from "./router";
+
+export async function render(url, response) {
+  const router = createRouter();
+
+  const memoryHistory = createMemoryHistory({
+    initialEntries: [url],
+  });
+
+  router.update({
+    history: memoryHistory,
+  });
+
+  await router.load();
+
+  const appHtml = ReactDOMServer.renderToString(<StartServer router={router} />);
+
+  response.statusCode = router.hasNotFoundMatch() ? 404 : 200;
+  response.setHeader("Content-Type", "text/html");
+  response.end(`<!DOCTYPE html>${appHtml}`);
+}
+```
+
+## Rendering the Application on the Client
+
+On the client, things are much simpler.
+
+- Create your router instance
+- Render your application using the `<StartClient />` component
+
+```tsx
+// src/entry-client.tsx
+
+import * as React from "react";
+import ReactDOM from "react-dom/client";
+
+import { StartClient } from "@tanstack/react-start";
+import { createRouter } from "./router";
+
+const router = createRouter();
+
+ReactDOM.hydrateRoot(document, <StartClient router={router} />);
+```
+
+With this setup, your application will be rendered on the server and then hydrated on the client!
+
+## Streaming SSR
+
+Streaming SSR is the most modern flavor of SSR and is the process of continuously and incrementally sending HTML markup to the client as it is rendered on the server. This is slightly different from traditional SSR in concept because beyond being able to dehydrate and rehydrate a critical first paint, markup and data with less priority or slower response times can be streamed to the client after the initial render, but in the same request.
+
+This pattern can be useful for pages that have slow or high-latency data fetching requirements. For example, if you have a page that needs to fetch data from a third-party API, you can stream the critical initial markup and data to the client and then stream the less-critical third-party data to the client as it is resolved.
+
+**This streaming pattern is all automatic as long as you are using `renderToPipeableStream`**.
+
+## Streaming Dehydration/Hydration
+
+Streaming dehydration/hydration is an advanced pattern that goes beyond markup and allows you to dehydrate and stream any supporting data from the server to the client and rehydrate it on arrival. This is useful for applications that may need to further use/manage the underlying data that was used to render the initial markup on the server.
+
+## Data Serialization
+
+When using SSR, data passed between the server and the client must be serialized before it is sent across network-boundaries. TanStack Router handles this serialization using a very lightweight serializer that supports common data types beyond JSON.stringify/JSON.parse.
+
+Out of the box, the following types are supported:
+
+- `undefined`
+- `Date`
+- `Error`
+- `FormData`
+
+If you feel that there are other types that should be supported by default, please open an issue on the TanStack Router repository.
+
+If you are using more complex data types like `Map`, `Set`, `BigInt`, etc, you may need to use a custom serializer to ensure that your type-definitions are accurate and your data is correctly serialized and deserialized. We are currently working on both a more robust serializer and a way to customize the serializer for your application. Open an issue if you are interested in helping out!
+
+<!-- This is where the `serializer` option on `createRouter` comes in. -->
+
+The Data Serialization API allows the usage of a custom serializer that can allow us to transparently use these data types when communicating across the network.
+
+<!-- The following example shows usage with [SuperJSON](https://github.com/blitz-js/superjson), however, anything that implements [`Start Serializer`](../../api/router/RouterOptionsType.md#serializer-property) can be used. -->
+
+```tsx
+import { SuperJSON } from "superjson";
+
+const router = createRouter({
+  serializer: SuperJSON,
+});
+```
+
+Just like that, TanStack Router will now appropriately use SuperJSON to serialize data across the network.
+
+## Example
+
+- `posts.tsx`
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/posts")();
+```
+
+You can then access this data anywhere you have access to your routes, including matches that can be mapped back to their routes.
+
+- `__root.tsx`
+
+```tsx
+import { createRootRoute } from "@tanstack/react-router";
+
+export const Route = createRootRoute({
+  component: () => {
+    const matches = useMatches();
+
+    return (
+      <div>
+        {matches.map((match) => {
+          return <div key={match.id}>{match.data.customData}</div>;
+        })}
+      </div>
+    );
+  },
+});
+```
+
+# TanStack Start
+
+TanStack Start is a full-stack framework for building server-rendered React applications built on top of [TanStack Router](https://tanstack.com/router).
+
+To set up a TanStack Start project, you'll need to:
+
+1. Install the dependencies
+2. Add a configuration file
+3. Create required templating
+
+Follow this guide to build a basic TanStack Start web application. Together, we will use TanStack Start to:
+
+- Serve an index page...
+- Which displays a counter...
+- With a button to increment the counter persistently.
+
+[Here is what that will look like](https://stackblitz.com/github/tanstack/router/tree/main/examples/react/start-basic-counter)
+
+Create a new project if you're starting fresh.
+
+```shell
+mkdir myApp
+cd myApp
+npm init -y
+```
+
+Create a `tsconfig.json` file with at least the following settings:
+
+```jsonc
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "moduleResolution": "Bundler",
+    "module": "Preserve",
+    "target": "ES2022",
+    "skipLibCheck": true,
+  },
+}
+```
+
+# Install Dependencies
+
+TanStack Start is powered by the following packages and need to be installed as dependencies:
+
+- [@tanstack/start](https://github.com/tanstack/start)
+- [@tanstack/react-router](https://tanstack.com/router)
+- [Vite](https://vite.dev/)
+
+To install them, run:
+
+```shell
+npm i @tanstack/react-start @tanstack/react-router vite
+```
+
+You'll also need React and the Vite React plugin, so install their dependencies as well:
+
+```shell
+npm i react react-dom @vitejs/plugin-react
+```
+
+Please, for you, your fellow developers, and your users' sake, use TypeScript:
+
+```shell
+npm i -D typescript @types/react @types/react-dom
+```
+
+# Update Configuration Files
+
+We'll then update our `package.json` to use Vite's CLI and set `"type": "module"`:
+
+```jsonc
+{
+  // ...
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "vite start",
+  },
+}
+```
+
+Then configure TanStack Start's `app.config.ts` file:
+
+```typescript
+// app.config.ts
+import { defineConfig } from "@tanstack/react-start/config";
+
+export default defineConfig({});
+```
+
+# Add the Basic Templating
+
+There are 2 required files for TanStack Start usage:
+
+1. The router configuration
+2. The root of your application
+
+Once configuration is done, we'll have a file tree that looks like the following:
+
+```
+.
+├── app/
+│   ├── routes/
+│   │   └── `__root.tsx`
+│   ├── `router.tsx`
+│   ├── `routeTree.gen.ts`
+├── `.gitignore`
+├── `app.config.ts`
+├── `package.json`
+└── `tsconfig.json`
+```
+
+## The Router Configuration
+
+This is the file that will dictate the behavior of TanStack Router used within Start for both the server and the client. Here, you can configure everything
+from the default [preloading functionality](../preloading.md) to [caching staleness](../data-loading.md).
+
+```tsx
+// app/router.tsx
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
+
+export function createRouter() {
+  const router = createTanStackRouter({
+    routeTree,
+  });
+
+  return router;
+}
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof createRouter>;
+  }
+}
+```
+
+> `routeTree.gen.ts` is not a file you're expected to have at this point.
+> It will be generated when you run TanStack Start (via `npm run dev` or `npm run start`) for the first time.
+
+## The Root of Your Application
+
+Finally, we need to create the root of our application. This is the entry point for all application routes. The code in this file will wrap all other routes in the application.
+
+```tsx
+// app/routes/__root.tsx
+import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
+import * as React from "react";
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
+      {
+        title: "TanStack Start Starter",
+      },
+    ],
+  }),
+  component: RootComponent,
+});
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  );
+}
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+# Writing Your First Route
+
+Now that we have the basic templating setup, we can write our first route. This is done by creating a new file in the `app/routes` directory.
+
+```tsx
+// app/routes/index.tsx
+import * as fs from "fs";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+
+const filePath = "count.txt";
+
+async function readCount() {
+  return parseInt(await fs.promises.readFile(filePath, "utf-8").catch(() => "0"));
+}
+
+const getCount = createServerFn({
+  method: "GET",
+}).handler(() => {
+  return readCount();
+});
+
+const updateCount = createServerFn({ method: "POST" })
+  .validator((d: number) => d)
+  .handler(async ({ data }) => {
+    const count = await readCount();
+    await fs.promises.writeFile(filePath, `${count + data}`);
+  });
+
+export const Route = createFileRoute("/")({
+  component: Home,
+  loader: async () => await getCount(),
+});
+
+function Home() {
+  const router = useRouter();
+  const state = Route.useLoaderData();
+
+  return (
+    <button
+      onClick={() => {
+        updateCount({ data: 1 }).then(() => {
+          router.invalidate();
+        });
+      }}
+    >
+      Add 1 to {state}?
+    </button>
+  );
+}
+```
+
+That's it! 🤯 You've now set up a TanStack Start project and written your first route. 🎉
+
+You can now run `npm run dev` to start your server and navigate to `http://localhost:3000` to see your route in action.
+
+# Type Safety
+
+TanStack Router is built to be as type-safe as possible within the limits of the TypeScript compiler and runtime. This means that it's not only written in TypeScript, but that it also **fully infers the types it's provided and tenaciously pipes them through the entire routing experience**.
+
+Ultimately, this means that you write **less types as a developer** and have **more confidence in your code** as it evolves.
+
+## Route Definitions
+
+### File-based Routing
+
+Routes are hierarchical, and so are their definitions. If you're using file-based routing, much of the type-safety is already taken care of for you.
+
+### Code-based Routing
+
+If you're using the `Route` class directly, you'll need to be aware of how to ensure your routes are typed properly using the `Route`'s `getParentRoute` option. This is because child routes need to be aware of **all** of their parent routes types. Without this, those precious search params you parsed out of your _layout_ and _pathless layout_ routes, 3 levels up, would be lost to the JS void.
+
+So, don't forget to pass the parent route to your child routes!
+
+```tsx
+const parentRoute = createRoute({
+  getParentRoute: () => parentRoute,
+});
+```
+
+## Exported Hooks, Components, and Utilities
+
+For the types of your router to work with top-level exports like `Link`, `useNavigate`, `useParams`, etc. they must permeate the type-script module boundary and be registered right into the library. To do this, we use declaration merging on the exported `Register` interface.
+
+```ts
+const router = createRouter({
+  // ...
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+```
+
+By registering your router with the module, you can now use the exported hooks, components, and utilities with your router's exact types.
+
+## Fixing the Component Context Problem
+
+Component context is a wonderful tool in React and other frameworks for providing dependencies to components. However, if that context is changing types as it moves throughout your component hierarchy, it becomes impossible for TypeScript to know how to infer those changes. To get around this, context-based hooks and components require that you give them a hint on how and where they are being used.
+
+```tsx
+export const Route = createFileRoute("/posts")({
+  component: PostsComponent,
+});
+
+function PostsComponent() {
+  // Each route has type-safe versions of most of the built-in hooks from TanStack Router
+  const params = Route.useParams();
+  const search = Route.useSearch();
+
+  // Some hooks require context from the *entire* router, not just the current route. To achieve type-safety here,
+  // we must pass the `from` param to tell the hook our relative position in the route hierarchy.
+  const navigate = useNavigate({ from: Route.fullPath });
+  // ... etc
+}
+```
+
+Every hook and component that requires a context hint will have a `from` param where you can pass the ID or path of the route you are rendering within.
+
+> 🧠 Quick tip: If your component is code-split, you can use the [getRouteApi function](../code-splitting.md#manually-accessing-route-apis-in-other-files-with-the-getrouteapi-helper) to avoid having to pass in the `Route.fullPath` to get access to the typed `useParams()` and `useSearch()` hooks.
+
+### What if I don't know the route? What if it's a shared component?
+
+The `from` property is optional, which means if you don't pass it, you'll get the router's best guess on what types will be available. Usually, that means you'll get a union of all of the types of all of the routes in the router.
+
+### What if I pass the wrong `from` path?
+
+It's technically possible to pass a `from` that satisfies TypeScript, but may not match the actual route you are rendering within at runtime. In this case, each hook and component that supports `from` will detect if your expectations don't match the actual route you are rendering within, and will throw a runtime error.
+
+### What if I don't know the route, or it's a shared component, and I can't pass `from`?
+
+If you are rendering a component that is shared across multiple routes, or you are rendering a component that is not within a route, you can pass `strict: false` instead of a `from` option. This will not only silence the runtime error, but will also give you relaxed, but accurate types for the potential hook you are calling. A good example of this is calling `useSearch` from a shared component:
+
+```tsx
+function MyComponent() {
+  const search = useSearch({ strict: false });
+}
+```
+
+In this case, the `search` variable will be typed as a union of all possible search params from all routes in the router.
+
+## Router Context
+
+Router context is so extremely useful as it's the ultimate hierarchical dependency injection. You can supply context to the router and to each and every route it renders. As you build up this context, TanStack Router will merge it down with the hierarchy of routes, so that each route has access to the context of all of its parents.
+
+The `createRootRouteWithContext` factory creates a new router with the instantiated type, which then creates a requirement for you to fulfill the same type contract to your router, and will also ensure that your context is properly typed throughout the entire route tree.
+
+```tsx
+const rootRoute = createRootRouteWithContext<{ whateverYouWant: true }>()({
+  component: App,
+});
+
+const routeTree = rootRoute.addChildren([
+  // ... all child routes will have access to `whateverYouWant` in their context
+]);
+
+const router = createRouter({
+  routeTree,
+  context: {
+    // This will be required to be passed now
+    whateverYouWant: true,
+  },
+});
+```
+
+## Performance Recommendations
+
+As your application scales, TypeScript check times will naturally increase. There are a few things to keep in mind when your application scales to keep your TS check times down.
+
+### Only infer types you need
+
+A great pattern with client side data caches (TanStack Query, etc.) is to prefetch data. For example with TanStack Query you might have a route which calls `queryClient.ensureQueryData` in a `loader`.
+
+```tsx
+export const Route = createFileRoute("/posts/$postId/deep")({
+  loader: ({ context: { queryClient }, params: { postId } }) =>
+    queryClient.ensureQueryData(postQueryOptions(postId)),
+  component: PostDeepComponent,
+});
+
+function PostDeepComponent() {
+  const params = Route.useParams();
+  const data = useSuspenseQuery(postQueryOptions(params.postId));
+
+  return <></>;
+}
+```
+
+This may look fine and for small route trees and you may not notice any TS performance issues. However in this case TS has to infer the loader's return type, despite it never being used in your route. If the loader data is a complex type with many routes that prefetch in this manner, it can slow down editor performance. In this case, the change is quite simple and let typescript infer Promise<void>.
+
+```tsx
+export const Route = createFileRoute("/posts/$postId/deep")({
+  loader: async ({ context: { queryClient }, params: { postId } }) => {
+    await queryClient.ensureQueryData(postQueryOptions(postId));
+  },
+  component: PostDeepComponent,
+});
+
+function PostDeepComponent() {
+  const params = Route.useParams();
+  const data = useSuspenseQuery(postQueryOptions(params.postId));
+
+  return <></>;
+}
+```
+
+This way the loader data is never inferred and it moves the inference out of the route tree to the first time you use `useSuspenseQuery`.
+
+### Narrow to relevant routes as much as you possibly can
+
+Consider the following usage of `Link`
+
+```tsx
+<Link to=".." search={{ page: 0 }} />
+<Link to="." search={{ page: 0 }} />
+```
+
+**These examples are bad for TS performance**. That's because `search` resolves to a union of all `search` params for all routes and TS has to check whatever you pass to the `search` prop against this potentially big union. As your application grows, this check time will increase linearly to number of routes and search params. We have done our best to optimize for this case (TypeScript will typically do this work once and cache it) but the initial check against this large union is expensive. This also applies to `params` and other API's such as `useSearch`, `useParams`, `useNavigate` etc.
+
+Instead you should try to narrow to relevant routes with `from` or `to`.
+
+```tsx
+<Link from={Route.fullPath} to=".." search={{page: 0}} />
+<Link from="/posts" to=".." search={{page: 0}} />
+```
+
+Remember you can always pass a union to `to` or `from` to narrow the routes you're interested in.
+
+```tsx
+const from: '/posts/$postId/deep' | '/posts/' = '/posts/'
+<Link from={from} to='..' />
+```
+
+You can also pass branches to `from` to only resolve `search` or `params` to be from any descendants of that branch:
+
+```tsx
+const from = '/posts'
+<Link from={from} to='..' />
+```
+
+`/posts` could be a branch with many descendants which share the same `search` or `params`
+
+### Consider using the object syntax of `addChildren`
+
+It's typical of routes to have `params` `search`, `loaders` or `context` that can even reference external dependencies which are also heavy on TS inference. For such applications, using objects for creating the route tree can be more performant than tuples.
+
+`createChildren` also can accept an object. For large route trees with complex routes and external libraries, objects can be much faster for TS to type check as opposed to large tuples. The performance gains depend on your project, what external dependencies you have and how the types for those libraries are written
+
+```tsx
+const routeTree = rootRoute.addChildren({
+  postsRoute: postsRoute.addChildren({ postRoute, postsIndexRoute }),
+  indexRoute,
+});
+```
+
+Note this syntax is more verbose but has better TS performance. With file based routing, the route tree is generated for you so a verbose route tree is not a concern
+
+### Avoid internal types without narrowing
+
+It's common you might want to re-use types exposed. For example you might be tempted to use `LinkProps` like so
+
+```tsx
+const props: LinkProps = {
+  to: '/posts/',
+}
+
+return (
+  <Link {...props}>
+)
+```
+
+**This is VERY bad for TS Performance**. The problem here is `LinkProps` has no type arguments and is therefore an extremely large type. It includes `search` which is a union of all `search` params, it contains `params` which is a union of all `params`. When merging this object with `Link` it will do a structural comparison of this huge type.
+
+Instead you can use `as const satisfies` to infer a precise type and not `LinkProps` directly to avoid the huge check
+
+```tsx
+const props = {
+  to: '/posts/',
+} as const satisfies LinkProps
+
+return (
+  <Link {...props}>
+)
+```
+
+As `props` is not of type `LinkProps` and therefore this check is cheaper because the type is much more precise. You can also improve type checking further by narrowing `LinkProps`
+
+```tsx
+const props = {
+  to: '/posts/',
+} as const satisfies LinkProps<RegisteredRouter, string '/posts/'>
+
+return (
+  <Link {...props}>
+)
+```
+
+This is even faster as we're checking against the narrowed `LinkProps` type.
+
+You can also use this to narrow the type of `LinkProps` to a specific type to be used as a prop or parameter to a function
+
+```tsx
+export const myLinkProps = [
+  {
+    to: "/posts",
+  },
+  {
+    to: "/posts/$postId",
+    params: { postId: "postId" },
+  },
+] as const satisfies ReadonlyArray<LinkProps>;
+
+export type MyLinkProps = (typeof myLinkProps)[number];
+
+const MyComponent = (props: { linkProps: MyLinkProps }) => {
+  return <Link {...props.linkProps} />;
+};
+```
+
+This is faster than using `LinkProps` directly in a component because `MyLinkProps` is a much more precise type
+
+Another solution is not to use `LinkProps` and to provide inversion of control to render a `Link` component narrowed to a specific route. Render props are a good method of inverting control to the user of a component
+
+```tsx
+export interface MyComponentProps {
+  readonly renderLink: () => React.ReactNode;
+}
+
+const MyComponent = (props: MyComponentProps) => {
+  return <div>{props.renderLink()}</div>;
+};
+
+const Page = () => {
+  return <MyComponent renderLink={() => <Link to="/absolute" />} />;
+};
+```
+
+This particular example is very fast as we've inverted control of where we're navigating to the user of the component. The `Link` is narrowed to the exact route
+we want to navigate to
+
+# Type Utilities
+
+Most types exposed by TanStack Router are internal, subject to breaking changes and not always easy to use. That is why TanStack Router has a subset of exposed types focused on ease of use with the intension to be used externally. These types provide the same type safe experience from TanStack Router's runtime concepts on the type level, with flexibility of where to provide type checking
+
+## Type checking Link options with `ValidateLinkOptions`
+
+`ValidateLinkOptions` type checks object literal types to ensure they conform to `Link` options at inference sites. For example, you may have a generic `HeadingLink` component which accepts a `title` prop along with `linkOptions`, the idea being this component can be re-used for any navigation.
+
+```tsx
+export interface HeaderLinkProps<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TOptions = unknown,
+> {
+  title: string;
+  linkOptions: ValidateLinkOptions<TRouter, TOptions>;
+}
+
+export function HeadingLink<TRouter extends RegisteredRouter, TOptions>(
+  props: HeaderLinkProps<TRouter, TOptions>,
+): React.ReactNode;
+export function HeadingLink(props: HeaderLinkProps): React.ReactNode {
+  return (
+    <>
+      <h1>{props.title}</h1>
+      <Link {...props.linkOptions} />
+    </>
+  );
+}
+```
+
+A more permissive overload of `HeadingLink` is used to avoid type assertions you would otherwise have to do with the generic signature. Using a looser signature without type parameters is an easy way to avoid type assertions in the implementation of `HeadingLink`
+
+All type parameters for utilities are optional but for the best TypeScript performance `TRouter` should always be specified for the public facing signature. And `TOptions` should always be used at inference sites like `HeadingLink` to infer the `linkOptions` to correctly narrow `params` and `search`
+
+The result of this is that `linkOptions` in the following is completely type-safe
+
+```tsx
+<HeadingLink title="Posts" linkOptions={{ to: '/posts' }} />
+<HeadingLink title="Post" linkOptions={{ to: '/posts/$postId', params: {postId: 'postId'} }} />
+```
+
+## Type checking an array of Link options with `ValidateLinkOptionsArray`
+
+All navigation type utilities have an array variant. `ValidateLinkOptionsArray` enables type checking of an array of `Link` options. For example, you might have a generic `Menu` component where each item is a `Link`.
+
+```tsx
+export interface MenuProps<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TItems extends ReadonlyArray<unknown> = ReadonlyArray<unknown>,
+> {
+  items: ValidateLinkOptionsArray<TRouter, TItems>;
+}
+
+export function Menu<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TItems extends ReadonlyArray<unknown>,
+>(props: MenuProps<TRouter, TItems>): React.ReactNode;
+export function Menu(props: MenuProps): React.ReactNode {
+  return (
+    <ul>
+      {props.items.map((item) => (
+        <li>
+          <Link {...item} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+This of course allows the following `items` prop to be completely type-safe
+
+```tsx
+<Menu items={[{ to: "/posts" }, { to: "/posts/$postId", params: { postId: "postId" } }]} />
+```
+
+It is also possible to fix `from` for each `Link` options in the array. This would allow all `Menu` items to navigate relative to `from`. Additional type checking of `from` can be provided by the `ValidateFromPath` utility
+
+```tsx
+export interface MenuProps<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TItems extends ReadonlyArray<unknown> = ReadonlyArray<unknown>,
+  TFrom extends string = string,
+> {
+  from: ValidateFromPath<TRouter, TFrom>;
+  items: ValidateLinkOptionsArray<TRouter, TItems, TFrom>;
+}
+
+export function Menu<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TItems extends ReadonlyArray<unknown>,
+  TFrom extends string = string,
+>(props: MenuProps<TRouter, TItems, TFrom>): React.ReactNode;
+export function Menu(props: MenuProps): React.ReactNode {
+  return (
+    <ul>
+      {props.items.map((item) => (
+        <li>
+          <Link {...item} from={props.from} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+`ValidateLinkOptionsArray` allows you to fix `from` by providing an extra type parameter. The result is a type safe array of `Link` options providing navigation relative to `from`
+
+```tsx
+<Menu from="/posts" items={[{ to: "." }, { to: "./$postId", params: { postId: "postId" } }]} />
+```
+
+## Type checking redirect options with `ValidateRedirectOptions`
+
+`ValidateRedirectOptions` type checks object literal types to ensure they conform to redirect options at inference sites. For example, you may need a generic `fetchOrRedirect` function which accepts a `url` along with `redirectOptions`, the idea being this function will redirect when the `fetch` fails.
+
+```tsx
+export async function fetchOrRedirect<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TOptions,
+>(url: string, redirectOptions: ValidateRedirectOptions<TRouter, TOptions>): Promise<unknown>;
+export async function fetchOrRedirect(
+  url: string,
+  redirectOptions: ValidateRedirectOptions,
+): Promise<unknown> {
+  const response = await fetch(url);
+
+  if (!response.ok && response.status === 401) {
+    throw redirect(redirectOptions);
+  }
+
+  return await response.json();
+}
+```
+
+The result is that `redirectOptions` passed to `fetchOrRedirect` is completely type-safe
+
+```tsx
+fetchOrRedirect("http://example.com/", { to: "/login" });
+```
+
+## Type checking navigate options with `ValidateNavigateOptions`
+
+`ValidateNavigateOptions` type checks object literal types to ensure they conform to navigate options at inference sites. For example, you may want to write a custom hook to enable/disable navigation.
+
+[//]: # "TypeCheckingNavigateOptionsWithValidateNavigateOptionsImpl"
+
+```tsx
+export interface UseConditionalNavigateResult {
+  enable: () => void;
+  disable: () => void;
+  navigate: () => void;
+}
+
+export function useConditionalNavigate<
+  TRouter extends RegisteredRouter = RegisteredRouter,
+  TOptions,
+>(navigateOptions: ValidateNavigateOptions<TRouter, TOptions>): UseConditionalNavigateResult;
+export function useConditionalNavigate(
+  navigateOptions: ValidateNavigateOptions,
+): UseConditionalNavigateResult {
+  const [enabled, setEnabled] = useState(false);
+  const navigate = useNavigate();
+  return {
+    enable: () => setEnabled(true),
+    disable: () => setEnabled(false),
+    navigate: () => {
+      if (enabled) {
+        navigate(navigateOptions);
+      }
+    },
+  };
+}
+```
+
+[//]: # "TypeCheckingNavigateOptionsWithValidateNavigateOptionsImpl"
+
+The result of this is that `navigateOptions` passed to `useConditionalNavigate` is completely type-safe and we can enable/disable navigation based on react state
+
+```tsx
+const { enable, disable, navigate } = useConditionalNavigate({
+  to: "/posts/$postId",
+  params: { postId: "postId" },
+});
+```

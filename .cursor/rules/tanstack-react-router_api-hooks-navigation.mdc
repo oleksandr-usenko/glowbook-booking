@@ -1,0 +1,545 @@
+---
+description: TanStack Router: API Hooks - Navigation (useNavigate, useParams, useRouter, useSearch)
+globs: src/**/*.ts,src/**/*.tsx
+alwaysApply: false
+---
+# useMatchRoute hook
+
+The `useMatchRoute` hook is a hook that returns a `matchRoute` function that can be used to match a route against either the current or pending location.
+
+## useMatchRoute returns
+
+- A `matchRoute` function that can be used to match a route against either the current or pending location.
+
+## matchRoute function
+
+The `matchRoute` function is a function that can be used to match a route against either the current or pending location.
+
+### matchRoute function options
+
+The `matchRoute` function accepts a single argument, an `options` object.
+
+- Type: [`UseMatchRouteOptions`](../UseMatchRouteOptionsType.md)
+
+### matchRoute function returns
+
+- The matched route's params or `false` if no route was matched
+
+## Examples
+
+```tsx
+import { useMatchRoute } from '@tanstack/react-router'
+
+// Current location: /posts/123
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({ to: '/posts/$postId' })
+  //    ^ { postId: '123' }
+}
+
+// Current location: /posts/123
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({ to: '/posts' })
+  //    ^ false
+}
+
+// Current location: /posts/123
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({ to: '/posts', fuzzy: true })
+  //    ^ {}
+}
+
+// Current location: /posts
+// Pending location: /posts/123
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({ to: '/posts/$postId', pending: true })
+  //    ^ { postId: '123' }
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({ to: '/posts/$postId/foo/$fooId' })
+  //    ^ { postId: '123', fooId: '456' }
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({
+    to: '/posts/$postId/foo/$fooId',
+    params: { postId: '123' },
+  })
+  //    ^ { postId: '123', fooId: '456' }
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({
+    to: '/posts/$postId/foo/$fooId',
+    params: { postId: '789' },
+  })
+  //    ^ false
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({
+    to: '/posts/$postId/foo/$fooId',
+    params: { fooId: '456' },
+  })
+  //    ^ { postId: '123', fooId: '456' }
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({
+    to: '/posts/$postId/foo/$fooId',
+    params: { postId: '123', fooId: '456' },
+  })
+  //    ^ { postId: '123', fooId: '456' }
+}
+
+// Current location: /posts/123/foo/456
+function Component() {
+  const matchRoute = useMatchRoute()
+  const params = matchRoute({
+    to: '/posts/$postId/foo/$fooId',
+    params: { postId: '789', fooId: '456' },
+  })
+  //    ^ false
+}
+```
+
+# useMatches hook
+
+The `useMatches` hook returns all of the [`RouteMatch`](../RouteMatchType.md) objects from the router **regardless of its callers position in the React component tree**.
+
+> [!TIP]
+> If you only want the parent or child matches, then you can use the [`useParentMatches`](../useParentMatchesHook.md) or the [`useChildMatches`](../useChildMatchesHook.md) based on the selection you need.
+
+## useMatches options
+
+The `useMatches` hook accepts a single _optional_ argument, an `options` object.
+
+### `opts.select` option
+
+- Optional
+- `(matches: RouteMatch[]) => TSelected`
+- If supplied, this function will be called with the route matches and the return value will be returned from `useMatches`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useMatches returns
+
+- If a `select` function is provided, the return value of the `select` function.
+- If no `select` function is provided, an array of [`RouteMatch`](../RouteMatchType.md) objects.
+
+## Examples
+
+```tsx
+import { useMatches } from '@tanstack/react-router'
+
+function Component() {
+  const matches = useMatches()
+  //     ^? [RouteMatch, RouteMatch, ...]
+  // ...
+}
+```
+
+# useNavigate hook
+
+The `useNavigate` hook is a hook that returns a `navigate` function that can be used to navigate to a new location. This includes changes to the pathname, search params, hash, and location state.
+
+## useNavigate options
+
+The `useNavigate` hook accepts a single argument, an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- Optional
+- Description: The location to navigate from. This is useful when you want to navigate to a new location from a specific location, rather than the current location.
+
+## useNavigate returns
+
+- A `navigate` function that can be used to navigate to a new location.
+
+## navigate function
+
+The `navigate` function is a function that can be used to navigate to a new location.
+
+### navigate function options
+
+The `navigate` function accepts a single argument, an `options` object.
+
+- Type: [`NavigateOptions`](../NavigateOptionsType.md)
+
+### navigate function returns
+
+- A `Promise` that resolves when the navigation is complete
+
+## Examples
+
+```tsx
+import { useNavigate } from '@tanstack/react-router'
+
+function PostsPage() {
+  const navigate = useNavigate({ from: '/posts' })
+  const handleClick = () => navigate({ search: { page: 2 } })
+  // ...
+}
+
+function Component() {
+  const navigate = useNavigate()
+  return (
+    <div>
+      <button
+        onClick={() =>
+          navigate({
+            to: '/posts',
+          })
+        }
+      >
+        Posts
+      </button>
+      <button
+        onClick={() =>
+          navigate({
+            to: '/posts',
+            search: { page: 2 },
+          })
+        }
+      >
+        Posts (Page 2)
+      </button>
+      <button
+        onClick={() =>
+          navigate({
+            to: '/posts',
+            hash: 'my-hash',
+          })
+        }
+      >
+        Posts (Hash)
+      </button>
+      <button
+        onClick={() =>
+          navigate({
+            to: '/posts',
+            state: { from: 'home' },
+          })
+        }
+      >
+        Posts (State)
+      </button>
+    </div>
+  )
+}
+```
+
+# useParams hook
+
+The `useParams` method returns all of the path parameters that were parsed for the closest match and all of its parent matches.
+
+## useParams options
+
+The `useParams` hook accepts an optional `options` object.
+
+### `opts.strict` option
+
+- Type: `boolean`
+- Optional - `default: true`
+- If `false`, the `opts.from` option will be ignored and types will be loosened to `Partial<AllParams>` to reflect the shared types of all params.
+
+### `opts.shouldThrow` option
+
+- Type: `boolean`
+- Optional
+- `default: true`
+- If `false`,`useParams` will not throw an invariant exception in case a match was not found in the currently rendered matches; in this case, it will return `undefined`.
+
+### `opts.select` option
+
+- Optional
+- `(params: AllParams) => TSelected`
+- If supplied, this function will be called with the params object and the return value will be returned from `useParams`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useParams returns
+
+- An object of of the match's and parent match path params or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useParams } from '@tanstack/react-router'
+
+const routeApi = getRouteApi('/posts/$postId')
+
+function Component() {
+  const params = useParams({ from: '/posts/$postId' })
+
+  // OR
+
+  const routeParams = routeApi.useParams()
+
+  // OR
+
+  const postId = useParams({
+    from: '/posts/$postId',
+    select: (params) => params.postId,
+  })
+
+  // OR
+
+  const looseParams = useParams({ strict: false })
+
+  // ...
+}
+```
+
+# useParentMatches hook
+
+The `useParentMatches` hook returns all of the parent [`RouteMatch`](../RouteMatchType.md) objects from the root down to the immediate parent of the current match in context. **It does not include the current match, which can be obtained using the `useMatch` hook.**
+
+> [!IMPORTANT]
+> If the router has pending matches and they are showing their pending component fallbacks, `router.state.pendingMatches` will used instead of `router.state.matches`.
+
+## useParentMatches options
+
+The `useParentMatches` hook accepts an optional `options` object.
+
+### `opts.select` option
+
+- Optional
+- `(matches: RouteMatch[]) => TSelected`
+- If supplied, this function will be called with the route matches and the return value will be returned from `useParentMatches`. This value will also be used to determine if the hook should re-render its parent component using shallow equality checks.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useParentMatches returns
+
+- If a `select` function is provided, the return value of the `select` function.
+- If no `select` function is provided, an array of [`RouteMatch`](../RouteMatchType.md) objects.
+
+## Examples
+
+```tsx
+import { useParentMatches } from '@tanstack/react-router'
+
+function Component() {
+  const parentMatches = useParentMatches()
+  //    ^ [RouteMatch, RouteMatch, ...]
+}
+```
+
+# useRouteContext hook
+
+The `useRouteContext` method is a hook that returns the current context for the current route. This hook is useful for accessing the current route context in a component.
+
+## useRouteContext options
+
+The `useRouteContext` hook accepts an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- Required
+- The RouteID to match the route context from.
+
+### `opts.select` option
+
+- Type: `(context: RouteContext) => TSelected`
+- Optional
+- If supplied, this function will be called with the route context object and the return value will be returned from `useRouteContext`.
+
+## useRouteContext returns
+
+- The current context for the current route or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useRouteContext } from '@tanstack/react-router'
+
+function Component() {
+  const context = useRouteContext({ from: '/posts/$postId' })
+  //    ^ RouteContext
+
+  // OR
+
+  const selected = useRouteContext({
+    from: '/posts/$postId',
+    select: (context) => context.postId,
+  })
+  //    ^ string
+
+  // ...
+}
+```
+
+# useRouter hook
+
+The `useRouter` method is a hook that returns the current instance of [`Router`](../RouterType.md) from context. This hook is useful for accessing the router instance in a component.
+
+## useRouter returns
+
+- The current [`Router`](../RouterType.md) instance.
+
+> ⚠️⚠️⚠️ **`router.state` is always up to date, but NOT REACTIVE. If you use `router.state` in a component, the component will not re-render when the router state changes. To get a reactive version of the router state, use the [`useRouterState`](../useRouterStateHook.md) hook.**
+
+## Examples
+
+```tsx
+import { useRouter } from '@tanstack/react-router'
+
+function Component() {
+  const router = useRouter()
+  //    ^ Router
+
+  // ...
+}
+```
+
+# useRouterState hook
+
+The `useRouterState` method is a hook that returns the current internal state of the router. This hook is useful for accessing the current state of the router in a component.
+
+> [!TIP]
+> If you want to access the current location or the current matches, you should try out the [`useLocation`](../useLocationHook.md) and [`useMatches`](../useMatchesHook.md) hooks first. These hooks are designed to be more ergonomic and easier to use than accessing the router state directly.
+
+## useRouterState options
+
+The `useRouterState` hook accepts an optional `options` object.
+
+### `opts.select` option
+
+- Type: `(state: RouterState) => TSelected`
+- Optional
+- If supplied, this function will be called with the [`RouterState`](../RouterStateType.md) object and the return value will be returned from `useRouterState`.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+## useRouterState returns
+
+- The current [`RouterState`](../RouterStateType.md) object or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useRouterState } from '@tanstack/react-router'
+
+function Component() {
+  const state = useRouterState()
+  //    ^ RouterState
+
+  // OR
+
+  const selected = useRouterState({
+    select: (state) => state.location,
+  })
+  //    ^ ParsedLocation
+
+  // ...
+}
+```
+
+# useSearch hook
+
+The `useSearch` method is a hook that returns the current search query parameters as an object for the current location. This hook is useful for accessing the current search string and query parameters in a component.
+
+## useSearch options
+
+The `useSearch` hook accepts an `options` object.
+
+### `opts.from` option
+
+- Type: `string`
+- Required
+- The RouteID to match the search query parameters from.
+
+### `opts.shouldThrow` option
+
+- Type: `boolean`
+- Optional
+- `default: true`
+- If `false`,`useSearch` will not throw an invariant exception in case a match was not found in the currently rendered matches; in this case, it will return `undefined`.
+
+### `opts.select` option
+
+- Type: `(search: SelectedSearchSchema) => TSelected`
+- Optional
+- If supplied, this function will be called with the search object and the return value will be returned from `useSearch`.
+
+### `opts.structuralSharing` option
+
+- Type: `boolean`
+- Optional
+- Configures whether structural sharing is enabled for the value returned by `select`.
+- See the [Render Optimizations guide](../../../guide/render-optimizations.md) for more information.
+
+### `opts.strict` option
+
+- Type: `boolean`
+- Optional - `default: true`
+- If `false`, the `opts.from` option will be ignored and types will be loosened to `Partial<FullSearchSchema>` to reflect the shared types of all search query parameters.
+
+## useSearch returns
+
+- If `opts.from` is provided, an object of the search query parameters for the current location or `TSelected` if a `select` function is provided.
+- If `opts.strict` is `false`, an object of the search query parameters for the current location or `TSelected` if a `select` function is provided.
+
+## Examples
+
+```tsx
+import { useSearch } from '@tanstack/react-router'
+
+function Component() {
+  const search = useSearch({ from: '/posts/$postId' })
+  //    ^ FullSearchSchema
+
+  // OR
+
+  const selected = useSearch({
+    from: '/posts/$postId',
+    select: (search) => search.postView,
+  })
+  //    ^ string
+
+  // OR
+
+  const looseSearch = useSearch({ strict: false })
+  //    ^ Partial<FullSearchSchema>
+
+  // ...
+}
+```
+

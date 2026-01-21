@@ -1,0 +1,250 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+---
+description: Guidelines for working with Tanstack Router
+globs: *.ts, *.tsx
+---
+
+# TanStack Router Guidelines
+
+## Core Principles
+
+- Use TanStack Router for all routing needs in the web application
+- Implement file-based routing with type-safe route definitions
+- Keep routing logic centralized and maintainable
+- Leverage TanStack Router's powerful data loading and caching capabilities
+
+## Route Configuration
+
+- Use file-based routing with the `src/routes/` directory structure
+- Define routes using `createFileRoute()` for regular routes
+- Use `createRootRoute()` for the root layout route (`__root.tsx`)
+- Generate route tree automatically using `@tanstack/router-plugin`
+- Keep route definitions in their respective files
+
+## Router Setup
+
+- Create router instance using `createRouter()` in `main.tsx`
+- Configure router options like `defaultPreload`, `scrollRestoration`, and `defaultStructuralSharing`
+- Register the router type for TypeScript safety using module declaration
+- Use `RouterProvider` component to provide router context
+
+```tsx
+const router = createRouter({
+  routeTree,
+  context: {},
+  defaultPreload: "intent",
+  scrollRestoration: true,
+  defaultStructuralSharing: true,
+  defaultPreloadStaleTime: 0,
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+```
+
+## Data Loading and Route Loaders
+
+- Use `loader` functions for route data fetching
+- Access loader data using `Route.useLoaderData()` hook
+- Implement proper error handling in loaders
+- Cache route data appropriately using built-in caching
+- Use async/await patterns for data fetching
+
+```tsx
+export const Route = createFileRoute("/")({
+  component: MyComponent,
+  loader: async () => {
+    return apiRequestJson<DataType>("/api/endpoint");
+  },
+});
+
+function MyComponent() {
+  const data = Route.useLoaderData();
+  return <div>{data.title}</div>;
+}
+```
+
+## Navigation
+
+- Use `Link` component for declarative navigation
+- Use `useNavigate` hook for programmatic navigation
+- Implement proper loading states during navigation
+- Handle navigation errors gracefully
+- Use typed route parameters with `Link` component
+
+```tsx
+import { Link, useNavigate } from "@tanstack/react-router";
+
+// Declarative navigation
+<Link to="/contracts">Contracts</Link>
+
+// Programmatic navigation
+const navigate = useNavigate();
+navigate({ to: "/settings/company" });
+```
+
+## Route Parameters and Search
+
+- Use typed route parameters with TypeScript
+- Access route parameters using route hooks
+- Validate route parameters and search params using Zod
+- Handle missing or invalid parameters gracefully
+- Implement search parameter validation with zod
+
+## Layout and Nested Routes
+
+- Use `Outlet` component for nested route rendering in `__root.tsx`
+- Implement shared layouts using the root route
+- Keep layout components focused and reusable
+- Handle loading states in layouts appropriately
+- Organize layouts in the `src/layouts/` directory if they are application-wide layouts
+- Context-wide layouts can leverage virtual routes
+
+```tsx
+// __root.tsx
+export const Route = createRootRoute({
+  component: () => (
+    <AppProviders>
+      <SidebarLayout>
+        <Outlet />
+        <TanStackRouterDevtools />
+      </SidebarLayout>
+    </AppProviders>
+  ),
+});
+```
+
+## Error Handling
+
+- Implement error boundaries for route errors
+- Use `errorComponent` for route-specific error handling
+- Show user-friendly error messages
+- Provide fallback UI for error states
+- Handle loader errors appropriately
+
+## File Organization
+
+- Follow file-based routing conventions in `src/routes/`
+- Use `__root.tsx` for the root layout
+- Use `index.tsx` for index routes
+- Group related routes in subdirectories
+- Keep route components colocated with route definitions
+- Place tests alongside route files with `.test.tsx` suffix
+- Ignore tests using the `-` character as prefix (e.g. `-with-contractors.test.tsx`)
+
+```
+src/routes/
+├── __root.tsx           # Root layout
+├── index.tsx            # Home page (/)
+├── contracts/           # Contracts section
+│   ├── index.tsx        # /contracts
+│   └── $id.tsx          # /contracts/:id
+└── settings/            # Settings section
+    └── company.tsx      # /settings/company
+```
+
+## Route Generation
+
+- Use `@tanstack/router-plugin` for automatic route tree generation
+- Configure the plugin in `vite.config.ts`
+- The `routeTree.gen.ts` file is auto-generated - do not edit manually
+
+## Type Safety
+
+- Leverage TanStack Router's full TypeScript integration
+- Use typed route parameters and search params
+- Implement proper type declarations for route data
+- Use the registered router type for type safety across the app
+
+## Development Tools
+
+- Use `TanStackRouterDevtools` in development mode
+- Place devtools in the root route for global access
+- Configure devtools to help debug routing issues
+- Use the `.tanstack` directory for generated files
+
+## Best Practices
+
+- Keep route components focused and simple
+- Implement proper code splitting using lazy loading
+- Use consistent URL patterns and naming conventions
+- Document complex routing logic
+- Test routing behavior thoroughly using React Testing Library
+- Preload routes based on user intent (`defaultPreload: "intent"`)
+- Use structural sharing for performance (`defaultStructuralSharing: true`)
+
+## Testing Routes
+
+- Test route components using React Testing Library
+- Mock API calls using MSW (Mock Service Worker)
+- Test route navigation and data loading
+- Test error states and loading states
+- Place test files alongside route files
+- Tests within the `routes/` folder should be ignored using - as prefix (e.g. `-my-route.test.tsx`)
+
+```tsx
+// routes/-index.test.tsx
+import { render, screen } from "@testing-library/react";
+import dashboardTranslations from "@public/en/dashboard.json";
+
+describe("DashboardRoute", () => {
+  it("renders the dashboard route with the actual route tree", async () => {
+    await renderWithRouteTree({
+      initialPath: "/",
+      routeTree,
+    });
+
+    expect(screen.getByText(dashboardTranslations.title)).toBeInTheDocument();
+  });
+});
+```
+
+- Use `renderWithCustomRouter` for cases where you want to create the routes yourself:
+
+```typescript
+import { renderWithCustomRouter } from '@your-org/test-utils';
+import { screen } from '@testing-library/react';
+
+describe('Dashboard', () => {
+  it('renders the dashboard page', async () => {
+    await renderWithCustomRouter({
+      initialPath: '/dashboard',
+      rootComponent: () => (
+        <Layout>
+          <Outlet />
+        </Layout>
+      ),
+      routes: [
+        {
+          path: '/dashboard',
+          component: () => <Dashboard />,
+        },
+      ],
+    });
+
+    expect(screen.getByText(dashboardTranslations.title)).toBeInTheDocument();
+  });
+```
+
+## Performance Considerations
+
+- Use intent-based preloading for better UX
+- Implement proper caching strategies for route data
+- Use structural sharing to minimize re-renders
+- Consider route-based code splitting for large applications
+- Monitor route bundle sizes and loading times
+- Keep critical parts of the route in the main route file, and things like the route component, route errors, etc, in a lazy component (e.g `with-contractors.lazy.tsx`)
+
+## Migration Notes
+
+- TanStack Router uses file-based routing instead of config-based routing
+- Route components are defined inline with route definitions
+- Data loading is handled through route loaders, not component-level effects
+- Navigation is type-safe and based on the route tree structure

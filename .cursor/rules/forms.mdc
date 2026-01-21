@@ -1,0 +1,108 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+---
+description: Guildelines for creating forms within the application.
+globs: *.ts, *.tsx
+---
+
+# Form handling
+
+- Use React Hook Form with Zod for validation
+- Define validation schemas using Zod
+- Validate form inputs before submission
+- Show validation errors next to the form fields
+- Use descriptive error messages for the user
+- Use i18n to display error messages
+
+## Form example
+
+```tsx
+import React from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+
+// Inline Zod schema with i18n error messages
+const useSchema = (t: (key: string) => string) =>
+  z.object({
+    name: z
+      .string()
+      .min(2, { message: t("form.errors.name_too_short") })
+      .max(50, { message: t("form.errors.name_too_long") }),
+    email: z
+      .string()
+      .email({ message: t("form.errors.invalid_email") }),
+    password: z
+      .string()
+      .min(8, { message: t("form.errors.password_too_short") }),
+  });
+
+type FormData = z.infer<ReturnType<typeof useSchema>>;
+
+export const ExampleForm: React.FC = () => {
+  const { t } = useI18n();
+  const schema = useSchema(t);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = (data: FormData) => {
+    // handle form submission
+    alert(JSON.stringify(data, null, 2));
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-md mx-auto">
+      <FormItem>
+        <Label htmlFor="name">{t("form.fields.name")}</Label>
+        <FormControl>
+          <Input id="name" {...register("name")} />
+        </FormControl>
+        <ErrorMessage
+          errors={errors}
+          name="name"
+          render={({ message }) => <FormMessage>{message}</FormMessage>}
+        />
+      </FormItem>
+
+      <FormItem>
+        <Label htmlFor="email">{t("form.fields.email")}</Label>
+        <FormControl>
+          <Input id="email" type="email" {...register("email")} />
+        </FormControl>
+        <ErrorMessage
+          errors={errors}
+          name="email"
+          render={({ message }) => <FormMessage>{message}</FormMessage>}
+        />
+      </FormItem>
+
+      <FormItem>
+        <Label htmlFor="password">{t("form.fields.password")}</Label>
+        <FormControl>
+          <Input id="password" type="password" {...register("password")} />
+        </FormControl>
+        <ErrorMessage
+          errors={errors}
+          name="password"
+          render={({ message }) => <FormMessage>{message}</FormMessage>}
+        />
+      </FormItem>
+
+      <Button type="submit" disabled={isSubmitting}>
+        {t("form.actions.submit")}
+      </Button>
+    </form>
+  );
+};
+```
+

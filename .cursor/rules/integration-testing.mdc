@@ -1,0 +1,222 @@
+---
+description:
+globs: *.test.tsx
+alwaysApply: false
+---
+
+# Integration Tests Guidelines
+
+## Core Principles
+
+- Integration tests should test the full integration between components, including real HTTP requests
+- Use MSW (Mock Service Worker) to intercept and respond to HTTP requests
+- **No mocking of HTTP requests** - all requests must be made against real MSW endpoints
+- Test real user workflows and data flows, with special attention to user behavior and allowed interactions by the existing code
+- Ensure tests are isolated and don't depend on external services
+
+## HTTP Request Handling
+
+### Real Requests Only
+
+- **Never mock HTTP requests** using vi.mock, or similar mocking utilities
+- All HTTP requests must be made against actual MSW endpoints
+- This ensures we test the real request/response cycle and error handling
+
+### MSW Endpoints
+
+- Use existing MSW endpoints located in `apps/web/src/test-utils/dev-server/handlers/`
+- These endpoints provide realistic responses for common scenarios
+- Endpoints are organized by domain (e.g., `access-control.ts`, `activities.ts`, `company.ts`)
+
+### Ad-hoc Mocking
+
+When a test scenario requires a specific HTTP response that's not covered by existing MSW endpoints:
+
+```tsx
+
+describe("Custom API Test", () => {
+  it("handles specific API response", async () => {
+    // Add ad-hoc mock for this specific test
+    server.use(
+      httpMock.get("/api/custom-endpoint", () => {
+        return HttpResponse.json({
+          id: "123",
+          name: "Custom Data",
+          status: "active",
+        });
+      }),
+    );
+
+    // Test implementation that makes real HTTP request
+    await renderWithRouteTree({
+      initialPath: "/custom-page",
+      routeTree,
+    });
+
+    expect(screen.getByText("Custom Data")).toBeInTheDocument();
+  });
+});
+```
+
+## Test Structure
+
+### Setup
+
+- Use `renderWithRouteTree` for testing complete route trees
+- Use `renderWithCustomRouter` for testing specific route configurations that are not specified in the app's route tree
+- Always clean up MSW handlers after tests
+
+### Example Integration Test
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import { routeTree } from "../../routeTree.gen";
+
+describe("Dashboard Integration", () => {
+  it("loads and displays dashboard data", async () => {
+    // Real HTTP request will be handled by MSW
+    await renderWithRouteTree({
+      initialPath: "/dashboard",
+      routeTree,
+    });
+
+    // Verify the real data flow
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Recent Activities")).toBeInTheDocument();
+  });
+
+  it("handles API errors gracefully", async () => {
+    // Override default handler for this specific test
+    server.use(
+      httpMock.get("/api/dashboard", () => {
+        return HttpResponse.json({ error: "Internal Server Error" }, { status: 500 });
+      }),
+    );
+
+    await renderWithRouteTree({
+      initialPath: "/dashboard",
+      routeTree,
+    });
+
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+  });
+});
+```
+
+## Best Practices
+
+### Test Isolation
+
+- Each test should be independent
+- Clean up any ad-hoc MSW handlers after each test
+- Use `beforeEach` and `afterEach` for setup/cleanup
+
+### Realistic Scenarios
+
+- Test complete user workflows
+- Include error scenarios and edge cases
+- Test loading states and data transformations
+
+### Performance
+
+- Keep tests focused on integration points
+- Avoid testing implementation details
+- Use proper async/await patterns
+
+## Common Patterns
+
+### Testing Route Loaders
+
+```tsx
+it("loads data via route loader", async () => {
+  await renderWithRouteTree({
+    initialPath: "/contracts/123",
+    routeTree,
+  });
+
+  // Verify data loaded through real route loader
+  expect(screen.getByText("Contract Details")).toBeInTheDocument();
+  expect(screen.getByText("Contract #123")).toBeInTheDocument();
+});
+```
+
+### Testing Form Submissions
+
+```tsx
+it("submits form data to API", async () => {
+  const user = userEvent.setup();
+
+  await renderWithRouteTree({
+    initialPath: "/contracts/create",
+    routeTree,
+  });
+
+  await user.type(screen.getByLabelText("Contract Name"), "New Contract");
+  await user.click(screen.getByRole("button", { name: "Create Contract" }));
+
+  // Verify real form submission and response handling
+  expect(screen.getByText("Contract created successfully")).toBeInTheDocument();
+});
+```
+
+### Testing Error Boundaries
+
+```tsx
+it("handles API errors in route loaders", async () => {
+  server.use(
+    httpMock.get("/api/contracts/123", () => {
+      return HttpResponse.json({ error: "Contract not found" }, { status: 404 });
+    }),
+  );
+
+  await renderWithRouteTree({
+    initialPath: "/contracts/123",
+    routeTree,
+  });
+
+  expect(screen.getByText("Contract not found")).toBeInTheDocument();
+});
+```
+
+## File Organization
+
+- Place integration tests alongside route files with `-` prefix
+- Use descriptive test names that explain the integration scenario
+- Group related integration tests in describe blocks
+
+```
+routes/
+├── contracts/
+│   ├── index.tsx
+│   ├── -index.test.tsx          # Integration tests
+│   └── $id.tsx
+└── settings/
+    ├── company.tsx
+    └── -company.test.tsx        # Integration tests
+```
+
+## Anti-patterns to Avoid
+
+❌ **Don't mock HTTP clients:**
+
+❌ **Don't mock fetch globally:**
+
+```tsx
+// WRONG - Don't do this
+global.fetch = vi.fn().mockResolvedValue({
+  json: () => Promise.resolve({ data: "mocked" }),
+});
+```
+
+✅ **Do use MSW for real HTTP interception:**
+
+```tsx
+// CORRECT - Use MSW
+server.use(
+  httpMock.get("/api/data", () => {
+    return HttpResponse.json({ data: "real response" });
+  }),
+);
+```
+
+This approach ensures integration tests validate real HTTP behavior while maintaining test isolation and reliability.
